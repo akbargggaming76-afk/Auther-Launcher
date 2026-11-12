@@ -4,8 +4,7 @@ name: AUTHER Launcher Build
 'on':
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
@@ -16,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -27,9 +26,10 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Create Android Project
+      - name: Create AUTHER Android Project
         run: |
           mkdir -p app/src/main/java/com/auther/launcher
+          mkdir -p app/src/main/assets
 
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -82,8 +82,10 @@ jobs:
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
               <application
                   android:label="AUTHER Launcher"
+                  android:usesCleartextTraffic="false"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
                   <activity
                       android:name=".MainActivity"
@@ -102,183 +104,269 @@ jobs:
           package com.auther.launcher;
 
           import android.app.Activity;
-          import android.app.AlertDialog;
           import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebSettings;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebChromeClient;
+          import android.webkit.DownloadListener;
           import android.content.Intent;
           import android.net.Uri;
-          import android.graphics.Color;
-          import android.graphics.Typeface;
-          import android.graphics.Bitmap;
-          import android.graphics.BitmapFactory;
-          import android.view.Gravity;
-          import android.view.View;
-          import android.widget.*;
-          import java.io.InputStream;
 
           public class MainActivity extends Activity {
-
-              int bg = Color.rgb(17,19,27);
-              int panel = Color.rgb(32,36,49);
-              int green = Color.rgb(120,184,92);
-              int red = Color.rgb(220,85,91);
-              int orange = Color.rgb(237,152,78);
-              int white = Color.WHITE;
-
-              LinearLayout root;
-              ImageView avatar;
-              TextView playerName;
-              TextView status;
-
-              int dp(float n) {
-                  return (int)(n * getResources()
-                      .getDisplayMetrics().density);
-              }
-
-              TextView label(String value, int size, int color) {
-                  TextView t = new TextView(this);
-                  t.setText(value);
-                  t.setTextSize(size);
-                  t.setTextColor(color);
-                  return t;
-              }
-
-              GradientDrawableBox drawable(int color, int radius) {
-                  return new GradientDrawableBox(color, dp(radius));
-              }
-
-              class GradientDrawableBox
-                  extends android.graphics.drawable.GradientDrawable {
-                  GradientDrawableBox(int color, int radius) {
-                      setColor(color);
-                      setCornerRadius(radius);
-                  }
-              }
-
-              LinearLayout card() {
-                  LinearLayout box = new LinearLayout(this);
-                  box.setOrientation(LinearLayout.VERTICAL);
-                  box.setBackground(drawable(panel, 16));
-                  return box;
-              }
-
-              Button menuButton(String title) {
-                  Button b = new Button(this);
-                  b.setText(title + "     ›");
-                  b.setTextColor(white);
-                  b.setTextSize(18);
-                  b.setAllCaps(false);
-                  b.setGravity(Gravity.CENTER_VERTICAL);
-                  b.setPadding(dp(20), 0, dp(18), 0);
-                  b.setBackgroundTintList(
-                      android.content.res.ColorStateList.valueOf(
-                          Color.rgb(48,65,45)));
-                  return b;
-              }
-
-              void showMenu(String name) {
-                  String message;
-
-                  switch(name) {
-                      case "Mods":
-                          message = "Pengelola Mods AUTHER.\\nFitur impor dan pengelolaan mod sedang dikembangkan.";
-                          break;
-                      case "Versi Minecraft":
-                          message = "Pengelola versi Minecraft.\\nPengunduh versi dan pemasangan game belum terintegrasi.";
-                          break;
-                      case "Resource Pack":
-                          message = "Pengelola Resource Pack.\\nFitur impor pack sedang dikembangkan.";
-                          break;
-                      default:
-                          message = "Pengelola Shader.\\nDukungan shader sedang dikembangkan.";
-                  }
-
-                  new AlertDialog.Builder(this)
-                      .setTitle(name)
-                      .setMessage(message)
-                      .setPositiveButton("TUTUP", null)
-                      .show();
-              }
-
-              void importSkin() {
-                  Intent intent = new Intent(
-                      Intent.ACTION_OPEN_DOCUMENT);
-                  intent.setType("image/*");
-                  intent.addCategory(Intent.CATEGORY_OPENABLE);
-                  startActivityForResult(intent, 100);
-              }
-
               @Override
-              protected void onActivityResult(
-                  int requestCode, int resultCode, Intent data) {
-                  super.onActivityResult(
-                      requestCode, resultCode, data);
+              protected void onCreate(Bundle state) {
+                  super.onCreate(state);
 
-                  if(requestCode == 100 &&
-                     resultCode == RESULT_OK && data != null) {
-                      Uri uri = data.getData();
+                  getWindow().setStatusBarColor(0xff11131b);
+                  getWindow().setNavigationBarColor(0xff11131b);
+
+                  WebView web = new WebView(this);
+                  web.setBackgroundColor(0xff11131b);
+
+                  WebSettings settings = web.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+
+                  web.setWebViewClient(new WebViewClient());
+                  web.setWebChromeClient(new WebChromeClient());
+
+                  web.setDownloadListener((url, agent, disposition,
+                                            mime, length) -> {
                       try {
-                          InputStream stream =
-                              getContentResolver().openInputStream(uri);
-                          Bitmap bitmap =
-                              BitmapFactory.decodeStream(stream);
-                          stream.close();
-
-                          if(bitmap != null) {
-                              avatar.setImageBitmap(bitmap);
-                              avatar.setScaleType(
-                                  ImageView.ScaleType.CENTER_CROP);
-                              Toast.makeText(this,
-                                  "Gambar skin berhasil dimuat",
-                                  Toast.LENGTH_SHORT).show();
-                          }
-                      } catch(Exception e) {
-                          Toast.makeText(this,
-                              "Gagal membuka gambar",
-                              Toast.LENGTH_SHORT).show();
+                          Intent intent = new Intent(
+                              Intent.ACTION_VIEW, Uri.parse(url));
+                          startActivity(intent);
+                      } catch (Exception e) {
                       }
-                  }
+                  });
+
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
               }
+          }
+          EOF
 
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  getWindow().setStatusBarColor(bg);
-                  getWindow().setNavigationBarColor(bg);
-                  home();
-              }
+          cat > app/src/main/assets/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="id">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>AUTHER Launcher</title>
+          <style>
+          *{box-sizing:border-box}
+          body{margin:0;background:#11131b;color:white;font-family:Arial}
+          .app{height:100dvh;padding:18px;display:grid;
+          grid-template-columns:0.85fr 1.15fr;grid-template-rows:1fr auto;gap:15px}
+          .left{display:flex;flex-direction:column;gap:15px}
+          .profile{display:flex;align-items:center;gap:12px}
+          .avatar{width:75px;height:75px;border:3px solid #dc555b;
+          border-radius:14px;display:grid;place-items:center;background:#292e3d}
+          .avatar img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+          .name{font-size:24px;font-weight:bold}
+          .import{flex:1;background:#292e3d;border:2px solid #ed984e;
+          border-radius:16px;color:white;font-weight:bold;font-size:17px}
+          .menu{border:2px solid #78b85c;border-radius:16px;
+          background:#202431;display:grid;grid-template-rows:repeat(4,1fr);overflow:hidden}
+          button{cursor:pointer}
+          .menu button{background:transparent;border:0;border-bottom:1px solid #465b40;
+          color:white;text-align:left;padding:15px;font-size:18px;font-weight:bold}
+          .menu button:last-child{border:0}
+          .playbar{grid-column:1/-1;text-align:center}
+          .play{width:70%;height:55px;border:2px solid #555;border-radius:40px;
+          background:#050505;color:white;font-size:20px;font-weight:bold}
+          .screen{position:fixed;inset:0;background:#11131b;padding:18px;
+          display:none;overflow:auto}
+          .screen.show{display:block}
+          .top{display:flex;align-items:center;justify-content:space-between;
+          margin-bottom:15px}
+          .top button{background:#303647;color:white;border:0;border-radius:9px;padding:10px}
+          input{background:#252b39;color:white;border:1px solid #6574ff;
+          border-radius:9px;padding:12px;width:100%;font-size:16px}
+          .item{background:#252b39;padding:13px;border-radius:12px;
+          margin:10px 0;display:flex;justify-content:space-between;gap:12px;align-items:center}
+          .item small{display:block;color:#b8bdca;margin-top:5px}
+          .download{background:#78b85c;color:#101510;border:0;
+          padding:10px;border-radius:9px;font-weight:bold}
+          .muted{color:#aeb4c4;font-size:13px}
+          @media(max-width:500px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;overflow:auto}.left{min-height:170px}.menu{min-height:230px}.playbar{grid-column:1}.play{width:100%}}
+          </style>
+          </head>
+          <body>
+          <main class="app">
+            <section class="left">
+              <div class="profile">
+                <label class="avatar">
+                  <span id="placeholder">A</span>
+                  <img id="avatar" hidden>
+                  <input id="skin" type="file" accept="image/*" hidden>
+                </label>
+                <div>
+                  <div class="name">AUTHER</div>
+                  <div class="muted">Minecraft Java Edition</div>
+                </div>
+              </div>
+              <button class="import" onclick="document.getElementById('skin').click()">
+                ▧ IMPOR SKIN
+              </button>
+            </section>
+            <section class="menu">
+              <button onclick="openCatalog('mod')">Mods　›</button>
+              <button onclick="openVersions()">Versi Minecraft　›</button>
+              <button onclick="openCatalog('resourcepack')">Resource Pack　›</button>
+              <button onclick="openCatalog('shader')">Shader　›</button>
+            </section>
+            <footer class="playbar">
+              <button class="play" onclick="alert('Minecraft Java Runtime belum terintegrasi.')">▶ PLAY</button>
+            </footer>
+          </main>
 
-              void home() {
-                  root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(dp(22), dp(15), dp(22), dp(12));
-                  root.setBackgroundColor(bg);
+          <section class="screen" id="catalog">
+            <div class="top">
+              <h2 id="heading">Download Center</h2>
+              <button onclick="closeScreen()">KEMBALI</button>
+            </div>
+            <input id="search" placeholder="Cari konten..." onkeydown="if(event.key==='Enter')searchCatalog()">
+            <p class="muted" id="info">Katalog dari Modrinth. Pilih konten untuk melihat unduhan.</p>
+            <div id="results"></div>
+          </section>
 
-                  LinearLayout content = new LinearLayout(this);
-                  content.setOrientation(LinearLayout.HORIZONTAL);
+          <script>
+          let category='mod';
 
-                  // LEFT SIDE
-                  LinearLayout left = new LinearLayout(this);
-                  left.setOrientation(LinearLayout.VERTICAL);
+          function closeScreen(){
+            document.getElementById('catalog').classList.remove('show');
+          }
 
-                  LinearLayout profile = new LinearLayout(this);
-                  profile.setGravity(Gravity.CENTER_VERTICAL);
+          async function openCatalog(type){
+            category=type;
+            document.getElementById('catalog').classList.add('show');
+            document.getElementById('heading').textContent=
+              type==='mod'?'Mods':type==='resourcepack'?'Resource Pack':'Shader';
+            document.getElementById('search').value='';
+            await searchCatalog();
+          }
 
-                  avatar = new ImageView(this);
-                  avatar.setImageResource(
-                      android.R.drawable.sym_def_app_icon);
-                  avatar.setBackground(drawable(red, 14));
-                  avatar.setPadding(dp(5), dp(5), dp(5), dp(5));
-                  avatar.setScaleType(
-                      ImageView.ScaleType.CENTER_CROP);
+          async function searchCatalog(){
+            const query=document.getElementById('search').value;
+            const results=document.getElementById('results');
+            const info=document.getElementById('info');
+            results.innerHTML='';
+            info.textContent='Memuat katalog...';
 
-                  profile.addView(avatar,
-                      new LinearLayout.LayoutParams(dp(75), dp(75)));
+            try{
+              const url='https://api.modrinth.com/v2/search?query='+
+                encodeURIComponent(query)+
+                '&facets='+encodeURIComponent(JSON.stringify([['project_type:'+category]]))+
+                '&limit=20';
 
-                  LinearLayout nameBox = new LinearLayout(this);
-                  nameBox.setOrientation(LinearLayout.VERTICAL);
-                  nameBox.setPadding(dp(12), 0, 0, 0);
+              const response=await fetch(url);
+              if(!response.ok)throw new Error('Katalog tidak tersedia');
+              const data=await response.json();
 
-                  playerName = label("AUTHER", 25, white);
+              info.textContent=data.hits.length+' hasil ditemukan';
+
+              data.hits.forEach(project=>{
+                const item=document.createElement('div');
+                item.className='item';
+
+                const details=document.createElement('div');
+                const title=document.createElement('strong');
+                title.textContent=project.title;
+
+                const desc=document.createElement('small');
+                desc.textContent=project.description;
+
+                details.append(title,desc);
+
+                const download=document.createElement('button');
+                download.className='download';
+                download.textContent='BUKA';
+
+                download.onclick=()=>{
+                  window.location.href='https://modrinth.com/'+
+                    category+'/'+project.slug;
+                };
+
+                item.append(details,download);
+                results.appendChild(item);
+              });
+
+              if(!data.hits.length)info.textContent='Tidak ada hasil.';
+            }catch(error){
+              info.textContent='Gagal memuat katalog. Periksa koneksi internet.';
+            }
+          }
+
+          async function openVersions(){
+            document.getElementById('catalog').classList.add('show');
+            document.getElementById('heading').textContent='Versi Minecraft';
+            const results=document.getElementById('results');
+            const info=document.getElementById('info');
+            results.innerHTML='';
+            info.textContent='Memuat daftar versi resmi...';
+
+            try{
+              const response=await fetch(
+                'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
+              if(!response.ok)throw new Error('Gagal');
+              const data=await response.json();
+              info.textContent='Daftar versi resmi Minecraft Java';
+
+              data.versions.filter(v=>v.type==='release').slice(0,30)
+              .forEach(v=>{
+                const item=document.createElement('div');
+                item.className='item';
+
+                const details=document.createElement('div');
+                const title=document.createElement('strong');
+                title.textContent=v.id;
+
+                const desc=document.createElement('small');
+                desc.textContent='Minecraft Java Release';
+
+                details.append(title,desc);
+
+                const button=document.createElement('button');
+                button.className='download';
+                button.textContent='PILIH';
+                button.onclick=()=>{
+                  info.textContent='Versi '+v.id+
+                    ' dipilih. Pengunduh dan pemasang game belum terintegrasi.';
+                };
+
+                item.append(details,button);
+                results.appendChild(item);
+              });
+            }catch(error){
+              info.textContent='Gagal memuat daftar versi. Periksa internet.';
+            }
+          }
+
+          document.getElementById('skin').addEventListener('change',e=>{
+            const file=e.target.files[0];
+            if(!file)return;
+            const img=document.getElementById('avatar');
+            img.src=URL.createObjectURL(file);
+            img.hidden=false;
+            document.getElementById('placeholder').hidden=true;
+          });
+          </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Build APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AUTHER-LAUNCHER-V0.1
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+UTHER", 25, white);
                   playerName.setTypeface(null, Typeface.BOLD);
 
                   TextView subtitle =
