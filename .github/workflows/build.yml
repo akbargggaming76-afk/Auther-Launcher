@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTHER Launcher</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #12141d;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+header {
+    background: #1f2331;
+    padding: 20px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 26px;
+    font-weight: bold;
+    letter-spacing: 3px;
+}
+
+button {
+    background: #5b75d2;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 22px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+main {
+    padding: 25px;
+    max-width: 1400px;
+    margin: auto;
+}
+
+.subtitle {
+    color: #aeb5cb;
+    margin-bottom: 22px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.card {
+    background: #1f2331;
+    border-radius: 20px;
+    padding: 25px;
+    min-height: 170px;
+}
+
+.card h2 {
+    font-size: 20px;
+}
+
+.card p {
+    color: #b8bfd2;
+    line-height: 1.6;
+}
+
+.play {
+    width: 100%;
+    margin-top: 22px;
+    padding: 19px;
+    font-size: 19px;
+    border-radius: 30px;
+}
+
+@media(max-width:700px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">Ⓐ AUTHER</div>
+    <button onclick="alert('Pengaturan AUTHER')">
+        ⚙ Pengaturan
+    </button>
+</header>
+
+<main>
+
+    <p class="subtitle">
+        Minecraft Java Edition • Android
+    </p>
+
+    <div class="grid">
+
+        <section class="card">
+            <h2>SELAMAT DATANG</h2>
+            <p>
+                Selamat datang di AUTHER Launcher.
+                Launcher Minecraft Java dengan tampilan
+                modern dan sederhana.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>AKUN</h2>
+            <p>
+                Belum ada akun yang ditambahkan.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>STATUS GAME</h2>
+            <p>
+                Belum ada versi Minecraft terpasang.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2>VERSI MINECRAFT</h2>
+            <p>
+                Pilih versi Minecraft yang ingin digunakan.
+            </p>
+            <button onclick="alert('Version Manager')">
+                DAFTAR VERSI
+            </button>
+        </section>
+
+    </div>
+
+    <button class="play"
+    onclick="alert('Runtime Minecraft belum terintegrasi')">
+        ▶ LUNCURKAN
+    </button>
+
+</main>
+
+</body>
+</html>
