@@ -22,6 +22,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Create Android Project
         run: |
           mkdir -p app/src/main/java/com/auther/launcher
@@ -99,91 +104,154 @@ jobs:
           import android.app.Activity;
           import android.os.Bundle;
           import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.content.res.ColorStateList;
           import android.view.Gravity;
+          import android.view.View;
           import android.widget.*;
 
           public class MainActivity extends Activity {
 
+              int bg = Color.rgb(19, 21, 30);
+              int panel = Color.rgb(35, 39, 53);
+              int accent = Color.rgb(95, 115, 255);
               LinearLayout root;
 
-              TextView makeText(String value, int size) {
+              int dp(float value) {
+                  return (int)(value * getResources().getDisplayMetrics().density);
+              }
+
+              TextView text(String value, int size, int color) {
                   TextView t = new TextView(this);
                   t.setText(value);
                   t.setTextSize(size);
-                  t.setTextColor(Color.WHITE);
+                  t.setTextColor(color);
                   return t;
+              }
+
+              LinearLayout card(String heading, String detail) {
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setGravity(Gravity.CENTER_VERTICAL);
+                  box.setPadding(dp(22), dp(18), dp(22), dp(18));
+                  box.setBackgroundColor(panel);
+
+                  TextView title = text(heading, 20, Color.WHITE);
+                  title.setTypeface(null, Typeface.BOLD);
+
+                  TextView description = text(detail, 14,
+                      Color.rgb(185, 190, 205));
+                  description.setPadding(0, dp(10), 0, 0);
+
+                  box.addView(title);
+                  box.addView(description);
+
+                  return box;
+              }
+
+              Button button(String label, int color) {
+                  Button b = new Button(this);
+                  b.setText(label);
+                  b.setTextSize(15);
+                  b.setTextColor(Color.WHITE);
+                  b.setAllCaps(false);
+                  b.setBackgroundTintList(
+                      ColorStateList.valueOf(color));
+                  return b;
               }
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  getWindow().setStatusBarColor(Color.rgb(20,22,31));
-                  getWindow().setNavigationBarColor(Color.rgb(20,22,31));
+
+                  getWindow().setStatusBarColor(bg);
+                  getWindow().setNavigationBarColor(bg);
+
                   home();
               }
 
               void home() {
                   root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(24,20,24,20);
-                  root.setBackgroundColor(Color.rgb(20,22,31));
+                  root.setPadding(dp(28), dp(20), dp(28), dp(20));
+                  root.setBackgroundColor(bg);
 
-                  TextView logo = makeText("Ⓐ AUTHER",28);
-                  root.addView(logo);
+                  // HEADER
+                  LinearLayout header = new LinearLayout(this);
+                  header.setOrientation(LinearLayout.VERTICAL);
 
-                  TextView subtitle = makeText(
-                      "Minecraft Java Edition",15);
-                  root.addView(subtitle);
+                  TextView logo = text("Ⓐ AUTHER", 30, Color.WHITE);
+                  logo.setTypeface(null, Typeface.BOLD);
 
-                  LinearLayout row = new LinearLayout(this);
-                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  TextView subtitle = text(
+                      "Minecraft Java Edition", 15,
+                      Color.rgb(190, 195, 210));
 
-                  LinearLayout account = panel(
-                      "AKUN","Tambahkan akun");
-                  LinearLayout version = panel(
+                  header.addView(logo);
+                  header.addView(subtitle);
+
+                  root.addView(header);
+
+                  // ACCOUNT AND VERSION CARDS
+                  LinearLayout content = new LinearLayout(this);
+                  content.setOrientation(LinearLayout.HORIZONTAL);
+                  content.setPadding(0, dp(24), 0, dp(20));
+
+                  LinearLayout account = card(
+                      "AKUN",
+                      "Belum ada akun\\nKetuk untuk mengelola akun"
+                  );
+
+                  LinearLayout version = card(
                       "VERSI MINECRAFT",
-                      "Belum ada versi terpasang");
+                      "Belum ada versi terpasang\\nPilih versi Minecraft"
+                  );
 
-                  row.addView(account,
-                      new LinearLayout.LayoutParams(0,0,1));
-                  row.addView(version,
-                      new LinearLayout.LayoutParams(0,0,1));
+                  LinearLayout.LayoutParams cardParams =
+                      new LinearLayout.LayoutParams(0,
+                          -1, 1);
 
-                  root.addView(row,
-                      new LinearLayout.LayoutParams(-1,0,1));
+                  cardParams.setMargins(0, 0, dp(12), 0);
+                  content.addView(account, cardParams);
 
-                  Button play = new Button(this);
-                  play.setText("LUNCURKAN");
+                  LinearLayout.LayoutParams versionParams =
+                      new LinearLayout.LayoutParams(0,
+                          -1, 1);
+
+                  versionParams.setMargins(dp(12), 0, 0, 0);
+                  content.addView(version, versionParams);
+
+                  root.addView(content,
+                      new LinearLayout.LayoutParams(-1, 0, 1));
+
+                  // SETTINGS
+                  LinearLayout settings = new LinearLayout(this);
+                  settings.setOrientation(LinearLayout.HORIZONTAL);
+                  settings.setGravity(Gravity.CENTER_VERTICAL);
+
+                  TextView settingText = text(
+                      "Pengaturan     RAM     Java     Mods     Resource Packs",
+                      13, Color.LTGRAY);
+
+                  settings.addView(settingText);
+                  root.addView(settings,
+                      new LinearLayout.LayoutParams(-1, dp(42)));
+
+                  // PLAY BUTTON
+                  Button play = button("LUNCURKAN", accent);
+                  play.setTextSize(18);
+                  play.setTypeface(null, Typeface.BOLD);
+
                   play.setOnClickListener(v ->
                       Toast.makeText(this,
-                          "Runtime Minecraft belum terintegrasi",
-                          Toast.LENGTH_LONG).show());
+                          "Minecraft Java Runtime belum terintegrasi",
+                          Toast.LENGTH_LONG).show()
+                  );
 
                   root.addView(play,
-                      new LinearLayout.LayoutParams(-1,60));
+                      new LinearLayout.LayoutParams(-1, dp(58)));
 
                   setContentView(root);
-              }
-
-              LinearLayout panel(String title, String description) {
-                  LinearLayout box = new LinearLayout(this);
-                  box.setOrientation(LinearLayout.VERTICAL);
-                  box.setGravity(Gravity.CENTER);
-                  box.setPadding(15,15,15,15);
-                  box.setBackgroundColor(Color.rgb(42,46,62));
-
-                  LinearLayout.LayoutParams params =
-                      new LinearLayout.LayoutParams(0,-1,1);
-                  params.setMargins(7,25,7,25);
-                  box.setLayoutParams(params);
-
-                  TextView heading = makeText(title,20);
-                  TextView body = makeText(description,14);
-
-                  box.addView(heading);
-                  box.addView(body);
-
-                  return box;
               }
           }
           EOF
