@@ -87,7 +87,7 @@ jobs:
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
                   <activity
                       android:name=".MainActivity"
-                      android:screenOrientation="sensorLandscape"
+                      android:screenOrientation="landscape"
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -102,26 +102,39 @@ jobs:
           package com.auther.launcher;
 
           import android.app.Activity;
+          import android.app.AlertDialog;
           import android.os.Bundle;
+          import android.content.Intent;
+          import android.net.Uri;
           import android.graphics.Color;
           import android.graphics.Typeface;
-          import android.content.res.ColorStateList;
+          import android.graphics.Bitmap;
+          import android.graphics.BitmapFactory;
           import android.view.Gravity;
           import android.view.View;
           import android.widget.*;
+          import java.io.InputStream;
 
           public class MainActivity extends Activity {
 
-              int bg = Color.rgb(19, 21, 30);
-              int panel = Color.rgb(35, 39, 53);
-              int accent = Color.rgb(95, 115, 255);
-              LinearLayout root;
+              int bg = Color.rgb(17,19,27);
+              int panel = Color.rgb(32,36,49);
+              int green = Color.rgb(120,184,92);
+              int red = Color.rgb(220,85,91);
+              int orange = Color.rgb(237,152,78);
+              int white = Color.WHITE;
 
-              int dp(float value) {
-                  return (int)(value * getResources().getDisplayMetrics().density);
+              LinearLayout root;
+              ImageView avatar;
+              TextView playerName;
+              TextView status;
+
+              int dp(float n) {
+                  return (int)(n * getResources()
+                      .getDisplayMetrics().density);
               }
 
-              TextView text(String value, int size, int color) {
+              TextView label(String value, int size, int color) {
                   TextView t = new TextView(this);
                   t.setText(value);
                   t.setTextSize(size);
@@ -129,128 +142,232 @@ jobs:
                   return t;
               }
 
-              LinearLayout card(String heading, String detail) {
+              GradientDrawableBox drawable(int color, int radius) {
+                  return new GradientDrawableBox(color, dp(radius));
+              }
+
+              class GradientDrawableBox
+                  extends android.graphics.drawable.GradientDrawable {
+                  GradientDrawableBox(int color, int radius) {
+                      setColor(color);
+                      setCornerRadius(radius);
+                  }
+              }
+
+              LinearLayout card() {
                   LinearLayout box = new LinearLayout(this);
                   box.setOrientation(LinearLayout.VERTICAL);
-                  box.setGravity(Gravity.CENTER_VERTICAL);
-                  box.setPadding(dp(22), dp(18), dp(22), dp(18));
-                  box.setBackgroundColor(panel);
-
-                  TextView title = text(heading, 20, Color.WHITE);
-                  title.setTypeface(null, Typeface.BOLD);
-
-                  TextView description = text(detail, 14,
-                      Color.rgb(185, 190, 205));
-                  description.setPadding(0, dp(10), 0, 0);
-
-                  box.addView(title);
-                  box.addView(description);
-
+                  box.setBackground(drawable(panel, 16));
                   return box;
               }
 
-              Button button(String label, int color) {
+              Button menuButton(String title) {
                   Button b = new Button(this);
-                  b.setText(label);
-                  b.setTextSize(15);
-                  b.setTextColor(Color.WHITE);
+                  b.setText(title + "     ›");
+                  b.setTextColor(white);
+                  b.setTextSize(18);
                   b.setAllCaps(false);
+                  b.setGravity(Gravity.CENTER_VERTICAL);
+                  b.setPadding(dp(20), 0, dp(18), 0);
                   b.setBackgroundTintList(
-                      ColorStateList.valueOf(color));
+                      android.content.res.ColorStateList.valueOf(
+                          Color.rgb(48,65,45)));
                   return b;
+              }
+
+              void showMenu(String name) {
+                  String message;
+
+                  switch(name) {
+                      case "Mods":
+                          message = "Pengelola Mods AUTHER.\\nFitur impor dan pengelolaan mod sedang dikembangkan.";
+                          break;
+                      case "Versi Minecraft":
+                          message = "Pengelola versi Minecraft.\\nPengunduh versi dan pemasangan game belum terintegrasi.";
+                          break;
+                      case "Resource Pack":
+                          message = "Pengelola Resource Pack.\\nFitur impor pack sedang dikembangkan.";
+                          break;
+                      default:
+                          message = "Pengelola Shader.\\nDukungan shader sedang dikembangkan.";
+                  }
+
+                  new AlertDialog.Builder(this)
+                      .setTitle(name)
+                      .setMessage(message)
+                      .setPositiveButton("TUTUP", null)
+                      .show();
+              }
+
+              void importSkin() {
+                  Intent intent = new Intent(
+                      Intent.ACTION_OPEN_DOCUMENT);
+                  intent.setType("image/*");
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  startActivityForResult(intent, 100);
+              }
+
+              @Override
+              protected void onActivityResult(
+                  int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(
+                      requestCode, resultCode, data);
+
+                  if(requestCode == 100 &&
+                     resultCode == RESULT_OK && data != null) {
+                      Uri uri = data.getData();
+                      try {
+                          InputStream stream =
+                              getContentResolver().openInputStream(uri);
+                          Bitmap bitmap =
+                              BitmapFactory.decodeStream(stream);
+                          stream.close();
+
+                          if(bitmap != null) {
+                              avatar.setImageBitmap(bitmap);
+                              avatar.setScaleType(
+                                  ImageView.ScaleType.CENTER_CROP);
+                              Toast.makeText(this,
+                                  "Gambar skin berhasil dimuat",
+                                  Toast.LENGTH_SHORT).show();
+                          }
+                      } catch(Exception e) {
+                          Toast.makeText(this,
+                              "Gagal membuka gambar",
+                              Toast.LENGTH_SHORT).show();
+                      }
+                  }
               }
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-
                   getWindow().setStatusBarColor(bg);
                   getWindow().setNavigationBarColor(bg);
-
                   home();
               }
 
               void home() {
                   root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(dp(28), dp(20), dp(28), dp(20));
+                  root.setPadding(dp(22), dp(15), dp(22), dp(12));
                   root.setBackgroundColor(bg);
 
-                  // HEADER
-                  LinearLayout header = new LinearLayout(this);
-                  header.setOrientation(LinearLayout.VERTICAL);
-
-                  TextView logo = text("Ⓐ AUTHER", 30, Color.WHITE);
-                  logo.setTypeface(null, Typeface.BOLD);
-
-                  TextView subtitle = text(
-                      "Minecraft Java Edition", 15,
-                      Color.rgb(190, 195, 210));
-
-                  header.addView(logo);
-                  header.addView(subtitle);
-
-                  root.addView(header);
-
-                  // ACCOUNT AND VERSION CARDS
                   LinearLayout content = new LinearLayout(this);
                   content.setOrientation(LinearLayout.HORIZONTAL);
-                  content.setPadding(0, dp(24), 0, dp(20));
 
-                  LinearLayout account = card(
-                      "AKUN",
-                      "Belum ada akun\\nKetuk untuk mengelola akun"
-                  );
+                  // LEFT SIDE
+                  LinearLayout left = new LinearLayout(this);
+                  left.setOrientation(LinearLayout.VERTICAL);
 
-                  LinearLayout version = card(
-                      "VERSI MINECRAFT",
-                      "Belum ada versi terpasang\\nPilih versi Minecraft"
-                  );
+                  LinearLayout profile = new LinearLayout(this);
+                  profile.setGravity(Gravity.CENTER_VERTICAL);
 
-                  LinearLayout.LayoutParams cardParams =
-                      new LinearLayout.LayoutParams(0,
-                          -1, 1);
+                  avatar = new ImageView(this);
+                  avatar.setImageResource(
+                      android.R.drawable.sym_def_app_icon);
+                  avatar.setBackground(drawable(red, 14));
+                  avatar.setPadding(dp(5), dp(5), dp(5), dp(5));
+                  avatar.setScaleType(
+                      ImageView.ScaleType.CENTER_CROP);
 
-                  cardParams.setMargins(0, 0, dp(12), 0);
-                  content.addView(account, cardParams);
+                  profile.addView(avatar,
+                      new LinearLayout.LayoutParams(dp(75), dp(75)));
 
-                  LinearLayout.LayoutParams versionParams =
-                      new LinearLayout.LayoutParams(0,
-                          -1, 1);
+                  LinearLayout nameBox = new LinearLayout(this);
+                  nameBox.setOrientation(LinearLayout.VERTICAL);
+                  nameBox.setPadding(dp(12), 0, 0, 0);
 
-                  versionParams.setMargins(dp(12), 0, 0, 0);
-                  content.addView(version, versionParams);
+                  playerName = label("AUTHER", 25, white);
+                  playerName.setTypeface(null, Typeface.BOLD);
+
+                  TextView subtitle =
+                      label("Minecraft Java Edition", 13,
+                          Color.LTGRAY);
+
+                  nameBox.addView(playerName);
+                  nameBox.addView(subtitle);
+
+                  profile.addView(nameBox);
+                  left.addView(profile);
+
+                  Button skin = new Button(this);
+                  skin.setText("▧  IMPOR SKIN");
+                  skin.setTextSize(17);
+                  skin.setAllCaps(false);
+                  skin.setTextColor(white);
+                  skin.setBackgroundTintList(
+                      android.content.res.ColorStateList.valueOf(
+                          orange));
+                  skin.setOnClickListener(v -> importSkin());
+
+                  LinearLayout.LayoutParams skinParams =
+                      new LinearLayout.LayoutParams(-1, 0, 1);
+                  skinParams.setMargins(0, dp(18), dp(12), 0);
+                  left.addView(skin, skinParams);
+
+                  // RIGHT SIDE
+                  LinearLayout right = new LinearLayout(this);
+                  right.setOrientation(LinearLayout.VERTICAL);
+                  right.setBackground(drawable(
+                      Color.rgb(35,57,39), 16));
+                  right.setPadding(dp(5), dp(5), dp(5), dp(5));
+
+                  String[] names = {
+                      "Mods",
+                      "Versi Minecraft",
+                      "Resource Pack",
+                      "Shader"
+                  };
+
+                  for(String name : names) {
+                      Button b = menuButton(name);
+                      b.setOnClickListener(v -> showMenu(name));
+
+                      LinearLayout.LayoutParams p =
+                          new LinearLayout.LayoutParams(-1, 0, 1);
+                      p.setMargins(0, dp(3), 0, dp(3));
+                      right.addView(b, p);
+                  }
+
+                  content.addView(left,
+                      new LinearLayout.LayoutParams(0, -1, 1));
+
+                  LinearLayout.LayoutParams rightParams =
+                      new LinearLayout.LayoutParams(0, -1, 1);
+                  rightParams.setMargins(dp(12), 0, 0, 0);
+                  content.addView(right, rightParams);
 
                   root.addView(content,
                       new LinearLayout.LayoutParams(-1, 0, 1));
 
-                  // SETTINGS
-                  LinearLayout settings = new LinearLayout(this);
-                  settings.setOrientation(LinearLayout.HORIZONTAL);
-                  settings.setGravity(Gravity.CENTER_VERTICAL);
-
-                  TextView settingText = text(
-                      "Pengaturan     RAM     Java     Mods     Resource Packs",
-                      13, Color.LTGRAY);
-
-                  settings.addView(settingText);
-                  root.addView(settings,
-                      new LinearLayout.LayoutParams(-1, dp(42)));
-
                   // PLAY BUTTON
-                  Button play = button("LUNCURKAN", accent);
-                  play.setTextSize(18);
+                  Button play = new Button(this);
+                  play.setText("▶  PLAY");
+                  play.setTextSize(19);
                   play.setTypeface(null, Typeface.BOLD);
+                  play.setTextColor(white);
+                  play.setAllCaps(false);
+                  play.setBackground(drawable(Color.BLACK, 40));
 
                   play.setOnClickListener(v ->
-                      Toast.makeText(this,
-                          "Minecraft Java Runtime belum terintegrasi",
-                          Toast.LENGTH_LONG).show()
+                      new AlertDialog.Builder(this)
+                          .setTitle("AUTHER Launcher")
+                          .setMessage(
+                              "Minecraft Java Runtime belum terintegrasi.\\n\\nTombol PLAY sudah aktif, tetapi game belum dapat dijalankan.")
+                          .setPositiveButton("OK", null)
+                          .show()
                   );
 
-                  root.addView(play,
-                      new LinearLayout.LayoutParams(-1, dp(58)));
+                  LinearLayout.LayoutParams playParams =
+                      new LinearLayout.LayoutParams(
+                          (int)(getResources()
+                              .getDisplayMetrics().widthPixels * 0.65),
+                          dp(55));
+                  playParams.gravity = Gravity.CENTER;
+                  playParams.setMargins(0, dp(12), 0, 0);
 
+                  root.addView(play, playParams);
                   setContentView(root);
               }
           }
