@@ -1,150 +1,391 @@
 
-name: AUTHER Launcher Build
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTHER Launcher</title>
 
-'on':
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+<style>
+* {
+    box-sizing: border-box;
+}
 
-jobs:
-  build:
-    name: Build AUTHER APK
-    runs-on: ubuntu-latest
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f0eff7;
+    color: #292b3a;
+}
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+header {
+    height: 70px;
+    display: flex;
+    align-items: center;
+    padding: 0 25px;
+    background: #f8f7fc;
+    border-bottom: 1px solid #dedde6;
+    gap: 25px;
+}
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+.logo {
+    font-size: 25px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    flex: 1;
+}
 
-      - name: Create Android Project
-        run: |
-          mkdir -p app/src/main/java/com/auther/launcher
+.toolbar {
+    display: flex;
+    gap: 15px;
+}
 
-          cat > settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.name = 'AutherLauncher'
-          include ':app'
-          EOF
+.toolbar button {
+    background: transparent;
+    color: #353747;
+    font-size: 23px;
+    padding: 8px;
+}
 
-          cat > build.gradle <<'EOF'
-          plugins {
-              id 'com.android.application' version '8.7.3' apply false
-          }
-          EOF
+button {
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+}
 
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          EOF
+main {
+    padding: 20px;
+    min-height: calc(100vh - 70px);
+}
 
-          cat > app/build.gradle <<'EOF'
-          plugins {
-              id 'com.android.application'
-          }
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    min-height: 470px;
+}
 
-          android {
-              namespace 'com.auther.launcher'
-              compileSdk 35
+.panel {
+    background: #fff;
+    border-radius: 30px;
+    padding: 25px;
+}
 
-              defaultConfig {
-                  applicationId 'com.auther.launcher'
-                  minSdk 23
-                  targetSdk 28
-                  versionCode 1
-                  versionName '0.1'
-              }
-          }
-          EOF
+.account {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
 
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application
-                  android:label="Auther Launcher"
-                  android:theme="@android:style/Theme.Material.Light.NoActionBar">
-                  <activity
-                      android:name=".MainActivity"
-                      android:screenOrientation="sensorLandscape"
-                      android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
+.plus {
+    font-size: 85px;
+    font-weight: 300;
+    margin-bottom: 15px;
+}
 
-          cat > app/src/main/java/com/auther/launcher/MainActivity.java <<'EOF'
-          package com.auther.launcher;
+.account h2 {
+    font-size: 23px;
+}
 
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.graphics.Color;
-          import android.view.Gravity;
-          import android.widget.*;
+.game {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
 
-          public class MainActivity extends Activity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
+.game-title {
+    font-size: 23px;
+    font-weight: bold;
+}
 
-                  LinearLayout root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setGravity(Gravity.CENTER);
-                  root.setPadding(24,24,24,24);
-                  root.setBackgroundColor(Color.rgb(18,20,29));
+.grass {
+    font-size: 55px;
+    text-align: center;
+    margin: 25px;
+}
 
-                  TextView logo = new TextView(this);
-                  logo.setText("Ⓐ AUTHER");
-                  logo.setTextSize(32);
-                  logo.setTextColor(Color.WHITE);
-                  root.addView(logo);
+.status {
+    text-align: center;
+    color: #77798b;
+    font-size: 17px;
+}
 
-                  TextView info = new TextView(this);
-                  info.setText("Minecraft Java Edition Launcher");
-                  info.setTextColor(Color.LTGRAY);
-                  info.setTextSize(18);
-                  root.addView(info);
+.launch {
+    width: 100%;
+    background: #485f99;
+    color: white;
+    border-radius: 40px;
+    padding: 20px;
+    font-size: 19px;
+}
 
-                  Button play = new Button(this);
-                  play.setText("LUNCURKAN");
-                  play.setOnClickListener(v ->
-                      Toast.makeText(this,
-                          "Minecraft runtime belum terintegrasi",
-                          Toast.LENGTH_LONG).show()
-                  );
+.page {
+    display: none;
+}
 
-                  root.addView(play);
-                  setContentView(root);
-              }
-          }
-          EOF
+.page.active {
+    display: block;
+}
 
-      - name: Build APK
-        run: gradle assembleDebug
+.version-list {
+    display: grid;
+    gap: 15px;
+}
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AUTHER-LAUNCHER-V0.1
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+.version-item {
+    padding: 20px;
+    border-radius: 20px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.version-item button {
+    background: #485f99;
+    color: white;
+    padding: 12px 22px;
+    border-radius: 25px;
+}
+
+.back {
+    background: #485f99;
+    color: white;
+    padding: 13px 25px;
+    border-radius: 25px;
+    margin-top: 20px;
+}
+
+.setting-card {
+    background: white;
+    padding: 25px;
+    border-radius: 20px;
+    margin-bottom: 15px;
+}
+
+select {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+}
+
+@media(max-width:650px) {
+    header {
+        padding: 0 12px;
+    }
+
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .panel {
+        min-height: 300px;
+    }
+
+    .toolbar {
+        gap: 3px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">Ⓐ AUTHER</div>
+
+    <div class="toolbar">
+        <button onclick="openPage('home')" title="Home">⌂</button>
+        <button onclick="openPage('versions')" title="Versi">▣</button>
+        <button onclick="openPage('mods')" title="Mod">◇</button>
+        <button onclick="openPage('settings')" title="Pengaturan">⚙</button>
+    </div>
+</header>
+
+<main>
+
+<!-- HOME -->
+<section id="home" class="page active">
+
+    <div class="dashboard">
+
+        <div class="panel account">
+
+            <div class="plus">+</div>
+
+            <h2>Tambahkan Akun</h2>
+
+            <p>Belum ada akun yang ditambahkan</p>
+
+            <button class="launch"
+                onclick="addAccount()">
+                TAMBAHKAN AKUN
+            </button>
+
+        </div>
+
+        <div class="panel game">
+
+            <div>
+                <div class="game-title">
+                    MINECRAFT JAVA
+                </div>
+
+                <div class="grass">🟩</div>
+
+                <div class="status" id="gameStatus">
+                    Tidak ada versi yang terinstal
+                </div>
+            </div>
+
+            <div>
+                <button class="launch"
+                    onclick="launchGame()">
+                    LUNCURKAN
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- VERSION MANAGER -->
+<section id="versions" class="page">
+
+    <h2>DAFTAR VERSI</h2>
+
+    <p>Versi Minecraft Java</p>
+
+    <div class="version-list">
+
+        <div class="version-item">
+            <b>Minecraft 1.21.4</b>
+            <button onclick="selectVersion('1.21.4')">
+                PILIH
+            </button>
+        </div>
+
+        <div class="version-item">
+            <b>Minecraft 1.20.1</b>
+            <button onclick="selectVersion('1.20.1')">
+                PILIH
+            </button>
+        </div>
+
+        <div class="version-item">
+            <b>Minecraft 1.19.4</b>
+            <button onclick="selectVersion('1.19.4')">
+                PILIH
+            </button>
+        </div>
+
+    </div>
+
+    <button class="back" onclick="openPage('home')">
+        KEMBALI
+    </button>
+
+</section>
+
+<!-- MODS -->
+<section id="mods" class="page">
+
+    <h2>MOD & RESOURCE PACK</h2>
+
+    <div class="setting-card">
+        <h3>Mod Manager</h3>
+        <p>Pengelolaan mod Minecraft.</p>
+    </div>
+
+    <div class="setting-card">
+        <h3>Resource Pack</h3>
+        <p>Pengelolaan resource pack Minecraft.</p>
+    </div>
+
+    <button class="back" onclick="openPage('home')">
+        KEMBALI
+    </button>
+
+</section>
+
+<!-- SETTINGS -->
+<section id="settings" class="page">
+
+    <h2>PENGATURAN</h2>
+
+    <div class="setting-card">
+        <h3>RAM</h3>
+
+        <select id="ram">
+            <option>1024 MB</option>
+            <option>2048 MB</option>
+            <option>3072 MB</option>
+            <option>4096 MB</option>
+        </select>
+    </div>
+
+    <div class="setting-card">
+        <h3>Java Runtime</h3>
+        <p>Runtime Java Android belum terintegrasi.</p>
+    </div>
+
+    <button class="back" onclick="openPage('home')">
+        KEMBALI
+    </button>
+
+</section>
+
+</main>
+
+<script>
+
+let selectedVersion = "";
+
+function openPage(page) {
+
+    document.querySelectorAll(".page").forEach(p => {
+        p.classList.remove("active");
+    });
+
+    document.getElementById(page).classList.add("active");
+
+}
+
+function selectVersion(version) {
+
+    selectedVersion = version;
+
+    document.getElementById("gameStatus").innerText =
+        "Minecraft Java " + version + " (dipilih)";
+
+    alert("Versi " + version + " dipilih.");
+
+    openPage("home");
+
+}
+
+function addAccount() {
+
+    alert("Sistem akun belum terintegrasi.");
+
+}
+
+function launchGame() {
+
+    if (!selectedVersion) {
+        alert("Silakan pilih versi Minecraft terlebih dahulu.");
+        return;
+    }
+
+    alert("Runtime Minecraft Java belum terintegrasi.");
+
+}
+
+</script>
+
+</body>
+</html>
