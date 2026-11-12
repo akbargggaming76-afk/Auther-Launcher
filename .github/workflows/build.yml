@@ -1,36 +1,325 @@
 
-name: Build Auther Launcher APK
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTHER Launcher</title>
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+<style>
+* {
+    box-sizing: border-box;
+}
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+body {
+    margin: 0;
+    background: #f0eff7;
+    color: #252638;
+    font-family: Arial, sans-serif;
+}
 
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+header {
+    height: 65px;
+    padding: 0 25px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+}
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+.logo {
+    font-size: 25px;
+    font-weight: 900;
+    letter-spacing: 2px;
+}
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+nav {
+    display: flex;
+    gap: 10px;
+}
 
-      - name: Build APK
-        run: gradle assembleDebug
+button {
+    border: none;
+    cursor: pointer;
+    padding: 13px 20px;
+    border-radius: 25px;
+    background: #4b609b;
+    color: white;
+    font-weight: bold;
+}
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Auther-Launcher-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+.layout {
+    display: flex;
+    min-height: calc(100vh - 65px);
+}
+
+main {
+    flex: 1;
+    padding: 22px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.card {
+    background: white;
+    border-radius: 25px;
+    padding: 25px;
+    min-height: 175px;
+}
+
+.card h3 {
+    margin-top: 0;
+}
+
+.card p {
+    color: #77798b;
+}
+
+.account {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.account .plus {
+    font-size: 65px;
+    font-weight: 300;
+}
+
+.play {
+    width: 100%;
+    margin-top: 18px;
+    padding: 18px;
+    font-size: 19px;
+}
+
+.menu {
+    display: none;
+    padding: 20px;
+}
+
+.menu.active {
+    display: block;
+}
+
+.menu button {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.version {
+    margin-top: 15px;
+    background: white;
+    border-radius: 20px;
+    padding: 18px;
+}
+
+@media(max-width:650px) {
+    header {
+        padding: 0 12px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    main {
+        padding: 12px;
+    }
+
+    nav button {
+        padding: 10px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">Ⓐ AUTHER</div>
+
+    <nav>
+        <button onclick="showPage('home')">⌂</button>
+        <button onclick="showPage('versions')">▦</button>
+        <button onclick="showPage('mods')">◇</button>
+        <button onclick="showPage('settings')">⚙</button>
+    </nav>
+</header>
+
+<div class="layout">
+
+<main id="home">
+
+    <h2>AUTHER LAUNCHER</h2>
+    <p> Minecraft Java Edition</p>
+
+    <div class="grid">
+
+        <div class="card">
+            <h3>SELAMAT DATANG</h3>
+            <p>
+                Selamat datang di Auther Launcher.
+                Launcher Minecraft dengan desain
+                sederhana dan modern.
+            </p>
+        </div>
+
+        <div class="card account">
+            <div class="plus">+</div>
+            <h3>Tambahkan Akun</h3>
+            <button onclick="addAccount()">
+                TAMBAH AKUN
+            </button>
+        </div>
+
+        <div class="card">
+            <h3>VERSI MINECRAFT</h3>
+            <p id="selectedVersion">
+                Tidak ada versi yang dipilih
+            </p>
+            <button onclick="showPage('versions')">
+                PILIH VERSI
+            </button>
+        </div>
+
+        <div class="card">
+            <h3>STATUS GAME</h3>
+            <p>Auther Launcher V0.1</p>
+            <p>Runtime belum terpasang</p>
+        </div>
+
+    </div>
+
+    <button class="play" onclick="launchGame()">
+        ▶ LUNCURKAN
+    </button>
+
+</main>
+
+<main id="versions" style="display:none">
+
+    <h2>DAFTAR VERSI</h2>
+
+    <p>Pilih versi Minecraft</p>
+
+    <div class="version">
+        <b>Minecraft Java 1.21.4</b>
+        <p>Versi contoh</p>
+        <button onclick="selectVersion('1.21.4')">
+            PILIH
+        </button>
+    </div>
+
+    <div class="version">
+        <b>Minecraft Java 1.20.1</b>
+        <p>Versi contoh</p>
+        <button onclick="selectVersion('1.20.1')">
+            PILIH
+        </button>
+    </div>
+
+    <button onclick="showPage('home')">
+        KEMBALI
+    </button>
+
+</main>
+
+<main id="mods" style="display:none">
+
+    <h2>MOD & MODPACK</h2>
+
+    <div class="card">
+        <h3>Mod Manager</h3>
+        <p>Pengelolaan mod akan tersedia setelah integrasi Android.</p>
+    </div>
+
+    <div class="card">
+        <h3>Resource Pack</h3>
+        <p>Pengelolaan resource pack akan tersedia setelah integrasi Android.</p>
+    </div>
+
+    <button onclick="showPage('home')">KEMBALI</button>
+
+</main>
+
+<main id="settings" style="display:none">
+
+    <h2>PENGATURAN</h2>
+
+    <div class="card">
+        <h3>RAM</h3>
+        <select id="ram">
+            <option>1024 MB</option>
+            <option>2048 MB</option>
+            <option>3072 MB</option>
+            <option>4096 MB</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <h3>Java</h3>
+        <p>Runtime Java Android belum terintegrasi.</p>
+    </div>
+
+    <button onclick="showPage('home')">KEMBALI</button>
+
+</main>
+
+</div>
+
+<script>
+
+function showPage(page) {
+
+    const pages = [
+        "home",
+        "versions",
+        "mods",
+        "settings"
+    ];
+
+    pages.forEach(id => {
+        document.getElementById(id).style.display =
+            id === page ? "block" : "none";
+    });
+
+}
+
+function selectVersion(version) {
+
+    document.getElementById("selectedVersion").innerText =
+        "Minecraft Java " + version;
+
+    alert("Versi dipilih: " + version);
+
+    showPage("home");
+
+}
+
+function addAccount() {
+
+    alert("Login akun belum terintegrasi.");
+
+}
+
+function launchGame() {
+
+    alert(
+        "Runtime Minecraft Java belum terintegrasi. " +
+        "Tampilan ini belum bisa menjalankan game."
+    );
+
+}
+
+</script>
+
+</body>
+</html>
