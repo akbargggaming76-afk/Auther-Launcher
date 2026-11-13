@@ -12,28 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: Install Android SDK
-        run: |
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
-          sdkmanager "platform-tools"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Create Android project
         run: |
-          mkdir -p app/src/main/assets
           mkdir -p app/src/main/java/com/auther/launcher
+          mkdir -p app/src/main/res/values
 
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -50,7 +46,7 @@ jobs:
                   mavenCentral()
               }
           }
-          rootProject.name = "AUTHERLauncher"
+          rootProject.name = "AUTHER-Launcher"
           include ':app'
           EOF
 
@@ -60,7 +56,10 @@ jobs:
           }
           EOF
 
-          echo "org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8" > gradle.properties
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
 
           cat > app/build.gradle <<'EOF'
           plugins {
@@ -73,7 +72,7 @@ jobs:
 
               defaultConfig {
                   applicationId 'com.auther.launcher'
-                  minSdk 26
+                  minSdk 23
                   targetSdk 28
                   versionCode 1
                   versionName '0.1'
@@ -81,13 +80,26 @@ jobs:
           }
           EOF
 
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#FF3030</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#101010</item>
+                  <item name="android:navigationBarColor">#101010</item>
+                  <item name="android:windowBackground">#101010</item>
+              </style>
+          </resources>
+          EOF
+
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
               <application
-                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
+                  android:theme="@style/AppTheme"
                   android:label="AUTHER Launcher"
-                  android:usesCleartextTraffic="true">
+                  android:allowBackup="true">
                   <activity
                       android:name=".MainActivity"
                       android:screenOrientation="landscape"
@@ -104,308 +116,275 @@ jobs:
           cat > app/src/main/java/com/auther/launcher/MainActivity.java <<'EOF'
           package com.auther.launcher;
 
-          import android.app.Activity;
-          import android.os.Bundle;
-          import android.webkit.WebView;
-          import android.webkit.WebSettings;
-          import android.webkit.WebViewClient;
+          import android.app.*;
+          import android.os.*;
+          import android.graphics.Color;
+          import android.view.*;
+          import android.widget.*;
+          import android.content.*;
+          import android.graphics.Typeface;
 
           public class MainActivity extends Activity {
-              WebView web;
+              LinearLayout root, content;
+              android.content.SharedPreferences prefs;
+
+              int bg = Color.rgb(16,16,16);
+              int red = Color.rgb(210,35,35);
+              int white = Color.WHITE;
+              int gray = Color.rgb(160,160,160);
+
+              String[] resolutions = {"50","60","75","85","90","100"};
+              String[] descriptions = {
+                  "Sangat High dan cukup Buram",
+                  "High dan Buram sedang",
+                  "Sangat sedang",
+                  "Sedang",
+                  "Cukup bagus",
+                  "Bagus dan HD"
+              };
 
               @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-
+              public void onCreate(Bundle b) {
+                  super.onCreate(b);
                   getWindow().getDecorView().setSystemUiVisibility(
-                      5894 | 1024 | 512 | 4096
+                      View.SYSTEM_UI_FLAG_FULLSCREEN |
+                      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                  );
+                  prefs = getSharedPreferences("auther_settings", MODE_PRIVATE);
+                  showHome();
+              }
+
+              TextView text(String value, int size) {
+                  TextView t = new TextView(this);
+                  t.setText(value);
+                  t.setTextColor(white);
+                  t.setTextSize(size);
+                  t.setPadding(12,10,12,10);
+                  return t;
+              }
+
+              void setup(String title) {
+                  root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(bg);
+
+                  TextView heading = text(title,23);
+                  heading.setTypeface(null,Typeface.BOLD);
+                  heading.setTextColor(red);
+                  root.addView(heading);
+
+                  ScrollView scroll = new ScrollView(this);
+                  content = new LinearLayout(this);
+                  content.setOrientation(LinearLayout.VERTICAL);
+                  content.setPadding(20,12,20,20);
+                  scroll.addView(content);
+                  root.addView(scroll,new LinearLayout.LayoutParams(
+                      -1,0,1
+                  ));
+
+                  LinearLayout nav = new LinearLayout(this);
+                  nav.setOrientation(LinearLayout.HORIZONTAL);
+                  addNav(nav,"Home",()->showHome());
+                  addNav(nav,"Download",()->showDownload());
+                  addNav(nav,"Account",()->showAccount());
+                  addNav(nav,"Setting",()->showSettings());
+                  root.addView(nav);
+                  setContentView(root);
+              }
+
+              void addNav(LinearLayout parent,String label,Runnable action) {
+                  Button b = new Button(this);
+                  b.setText(label);
+                  b.setTextColor(white);
+                  b.setBackgroundTintList(
+                      android.content.res.ColorStateList.valueOf(red)
+                  );
+                  parent.addView(b,new LinearLayout.LayoutParams(0,55,1));
+                  b.setOnClickListener(v->action.run());
+              }
+
+              void addText(String s,int size) {
+                  content.addView(text(s,size));
+              }
+
+              void addButton(String label,Runnable action) {
+                  Button b = new Button(this);
+                  b.setText(label);
+                  b.setTextColor(white);
+                  b.setBackgroundTintList(
+                      android.content.res.ColorStateList.valueOf(red)
+                  );
+                  content.addView(b);
+                  b.setOnClickListener(v->action.run());
+              }
+
+              void showHome() {
+                  setup("AUTHER LAUNCHER");
+                  content.setGravity(Gravity.CENTER);
+                  addText("Minecraft Java Launcher",20);
+                  addButton("PLAY",()->new AlertDialog.Builder(this)
+                      .setMessage("Minecraft Java runtime belum terintegrasi.")
+                      .setPositiveButton("OK",null).show());
+                  addText("V0.1",14);
+              }
+
+              void showDownload() {
+                  setup("Download");
+                  addButton("Version & Loader",()->message("Katalog versi belum terhubung."));
+                  addButton("Mods",()->message("Katalog mod belum terhubung."));
+                  addButton("Shader",()->message("Katalog shader belum terhubung."));
+                  addButton("Worlds",()->message("Impor dunia belum tersedia."));
+                  addButton("Installed",()->message("Belum ada daftar instalasi."));
+              }
+
+              void showAccount() {
+                  setup("Account");
+                  addText("Pilih jenis akun",18);
+                  addButton("Offline",()->message("Login Offline belum diintegrasikan."));
+                  addButton("Ely.by",()->message("Login Ely.by belum diintegrasikan."));
+                  addButton("Microsoft",()->message("Login Microsoft belum diintegrasikan."));
+              }
+
+              void showSettings() {
+                  setup("Setting");
+                  addButton("Renderer Cuality",()->showQuality());
+                  addButton("Custome controller",()->message("Pengaturan controller belum terhubung ke game."));
+                  addButton("mouse setting",()->message("Pengaturan mouse belum terhubung ke game."));
+                  addButton("Background",()->message("Pengaturan background."));
+                  addButton("Tentang",()->showAbout());
+              }
+
+              void showQuality() {
+                  setup("Cuality");
+
+                  addText("Runtime",18);
+                  String[] runtimes = {"25","21","17","8"};
+                  String selectedRuntime = prefs.getString("runtime","17");
+
+                  RadioGroup runtimeGroup = new RadioGroup(this);
+                  runtimeGroup.setOrientation(RadioGroup.HORIZONTAL);
+
+                  for(String r : runtimes) {
+                      RadioButton rb = new RadioButton(this);
+                      rb.setText(r);
+                      rb.setTextColor(white);
+                      rb.setButtonTintList(
+                          android.content.res.ColorStateList.valueOf(red)
+                      );
+                      runtimeGroup.addView(rb);
+                      if(r.equals(selectedRuntime)) rb.setChecked(true);
+                  }
+
+                  runtimeGroup.setOnCheckedChangeListener((g,id)->{
+                      RadioButton selected = findViewById(id);
+                      if(selected != null)
+                          prefs.edit().putString(
+                              "runtime",selected.getText().toString()
+                          ).apply();
+                  });
+                  content.addView(runtimeGroup);
+
+                  addText("Memory",18);
+
+                  int[] memoryValues = {140,1024,1045,2042};
+                  String[] memoryLabels = {"1gb","2gb","3gb","4gb"};
+                  int savedMemory = prefs.getInt("memory",1024);
+
+                  TextView memoryNumber = text(
+                      String.valueOf(savedMemory),18
+                  );
+                  content.addView(memoryNumber);
+
+                  SeekBar memorySlider = new SeekBar(this);
+                  memorySlider.setMax(3);
+                  int initial = 1;
+                  for(int i=0;i<memoryValues.length;i++)
+                      if(memoryValues[i] == savedMemory) initial=i;
+                  memorySlider.setProgress(initial);
+                  content.addView(memorySlider);
+
+                  TextView memoryChoices = text(
+                      "1gb       2gb       3gb       4gb",14
+                  );
+                  content.addView(memoryChoices);
+
+                  memorySlider.setOnSeekBarChangeListener(
+                      new SeekBar.OnSeekBarChangeListener() {
+                          public void onProgressChanged(SeekBar s,int p,boolean u) {
+                              memoryNumber.setText(
+                                  String.valueOf(memoryValues[p])
+                              );
+                              prefs.edit().putInt("memory",memoryValues[p]).apply();
+                          }
+                          public void onStartTrackingTouch(SeekBar s) {}
+                          public void onStopTrackingTouch(SeekBar s) {}
+                      }
                   );
 
-                  web = new WebView(this);
-                  WebSettings settings = web.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setAllowFileAccess(true);
+                  addText("Tampilan resolusi",18);
 
-                  web.setWebViewClient(new WebViewClient());
-                  web.loadUrl("file:///android_asset/index.html");
+                  int savedResolution = prefs.getInt("resolution",100);
+                  int index = 5;
+                  for(int i=0;i<resolutions.length;i++)
+                      if(Integer.parseInt(resolutions[i]) == savedResolution)
+                          index=i;
 
-                  setContentView(web);
+                  TextView description = text(descriptions[index],16);
+                  content.addView(description);
+
+                  SeekBar resolutionSlider = new SeekBar(this);
+                  resolutionSlider.setMax(5);
+                  resolutionSlider.setProgress(index);
+                  content.addView(resolutionSlider);
+
+                  TextView choices = text(
+                      "50       60       75       85       90       100",16
+                  );
+                  content.addView(choices);
+
+                  resolutionSlider.setOnSeekBarChangeListener(
+                      new SeekBar.OnSeekBarChangeListener() {
+                          public void onProgressChanged(SeekBar s,int p,boolean u) {
+                              description.setText(descriptions[p]);
+                              prefs.edit().putInt(
+                                  "resolution",
+                                  Integer.parseInt(resolutions[p])
+                              ).apply();
+                          }
+                          public void onStartTrackingTouch(SeekBar s) {}
+                          public void onStopTrackingTouch(SeekBar s) {}
+                      }
+                  );
               }
 
-              @Override
-              public void onBackPressed() {
-                  if (web != null && web.canGoBack()) {
-                      web.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
+              void showAbout() {
+                  setup("Tentang");
+                  addText("v0.1     cek pembaruan",17);
+                  addText("Dibuat oleh",17);
+                  addText("YuzeeCraft",17);
+                  addButton("Cek pembaruan",()->{
+                      Intent i = new Intent(Intent.ACTION_VIEW,
+                          android.net.Uri.parse(
+                              "https://whatsapp.com/channel/0029VbEhRzO4IBhBLF0U5K0t"
+                          ));
+                      startActivity(i);
+                  });
+              }
+
+              void message(String msg) {
+                  new AlertDialog.Builder(this)
+                      .setMessage(msg)
+                      .setPositiveButton("OK",null).show();
               }
           }
-          EOF
-
-      - name: Create launcher interface
-        run: |
-          cat > app/src/main/assets/index.html <<'EOF'
-          <!DOCTYPE html>
-          <html lang="id">
-          <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>AUTHER Launcher</title>
-          <style>
-          *{box-sizing:border-box}
-          body{
-            margin:0;background:#101010;color:white;
-            font-family:Arial,sans-serif;
-            cursor:none;overflow:hidden
-          }
-          button,input{
-            font:inherit
-          }
-          button{
-            background:#a71919;color:white;border:1px solid #e23b3b;
-            padding:10px 22px;border-radius:5px;cursor:none
-          }
-          input{
-            width:100%;padding:12px;background:#202020;
-            color:white;border:1px solid #555;border-radius:5px
-          }
-          .cursor{
-            position:fixed;z-index:9999;pointer-events:none;
-            color:#fff;font-size:21px;line-height:15px;
-            transform:translate(-3px,-2px)
-          }
-          .cursor span{display:block;margin-left:5px}
-          .app{display:flex;height:100vh}
-          aside{
-            width:180px;flex-shrink:0;background:#171717;
-            border-right:2px solid #a71919;padding:15px
-          }
-          .logo{font-size:23px;font-weight:bold;color:#ef3737;margin-bottom:25px}
-          .nav{
-            display:block;width:100%;margin:8px 0;text-align:left;
-            background:#222;border:0
-          }
-          .nav.active{background:#9d1717}
-          main{flex:1;padding:22px;overflow:auto}
-          .page{display:none}
-          .page.active{display:block}
-          h2{color:#ef4545}
-          .home{
-            height:85vh;display:flex;flex-direction:column;
-            align-items:center;justify-content:center;
-            background:linear-gradient(140deg,#281111,#111 60%,#351010);
-            border-radius:10px
-          }
-          .play{min-width:125px;font-weight:bold;font-size:17px}
-          .selected{margin-top:12px;color:#ccc}
-          .columns{display:grid;grid-template-columns:1fr 260px;gap:18px}
-          .panel{background:#1c1c1c;padding:15px;border-radius:8px}
-          .item{
-            background:#292929;margin:7px 0;padding:12px;
-            border-radius:5px
-          }
-          .account{max-width:440px;margin:auto}
-          .field{margin:14px 0}
-          .field label{display:block;margin-bottom:7px}
-          .center{text-align:center;margin-top:20px}
-          .center button{min-width:115px}
-          .muted{color:#aaa;font-size:12px}
-          .row{display:flex;gap:8px;align-items:center}
-          .row button{flex:1}
-          .loading{
-            position:fixed;inset:0;background:#111;
-            display:none;align-items:center;justify-content:center;
-            font-size:19px
-          }
-          .loading.show{display:flex}
-          .status{color:#f5aaaa;margin-top:12px}
-          @media(max-width:650px){
-            aside{width:145px;padding:9px}
-            main{padding:12px}
-            .columns{grid-template-columns:1fr 190px}
-          }
-          </style>
-          </head>
-          <body>
-          <div class="cursor" id="cursor">∆<span>|</span></div>
-
-          <div class="app">
-            <aside>
-              <div class="logo">AUTHER</div>
-              <button class="nav active" onclick="page('home',this)">Home</button>
-              <button class="nav" onclick="page('download',this)">Download</button>
-              <button class="nav" onclick="page('account',this)">Account</button>
-              <button class="nav" onclick="page('settings',this)">Setting</button>
-              <button class="nav" onclick="page('about',this)">Tentang</button>
-            </aside>
-
-            <main>
-              <section class="page active" id="home">
-                <div class="home">
-                  <button class="play" onclick="playGame()">PLAY</button>
-                  <div class="selected" id="selectedVersion">
-                    Belum ada versi terpasang
-                  </div>
-                  <div class="status" id="playStatus"></div>
-                </div>
-              </section>
-
-              <section class="page" id="download">
-                <h2>Download</h2>
-                <div class="columns">
-                  <div class="panel">
-                    <h3 id="categoryTitle">Version & Loader</h3>
-                    <div id="catalog">
-                      Pilih kategori di sebelah kanan.
-                    </div>
-                    <div class="row">
-                      <button onclick="resetCatalog()">Remove</button>
-                      <button onclick="nextCatalog()">Next</button>
-                    </div>
-                  </div>
-                  <div class="panel">
-                    <button class="nav active" onclick="category('Version & Loader')">Version & Loader</button>
-                    <button class="nav" onclick="category('Mods')">Mods</button>
-                    <button class="nav" onclick="category('Shader')">Shader</button>
-                    <button class="nav" onclick="category('Worlds')">Worlds</button>
-                    <button class="nav" onclick="category('Installed')">Installed</button>
-                  </div>
-                </div>
-              </section>
-
-              <section class="page" id="account">
-                <h2>Account</h2>
-                <div class="account panel">
-                  <div class="row">
-                    <button onclick="accountType('offline')">Offline</button>
-                    <button onclick="accountType('ely')">Ely.by</button>
-                    <button onclick="accountType('microsoft')">Microsoft</button>
-                  </div>
-                  <div id="accountForm" style="margin-top:22px">
-                    Pilih jenis akun.
-                  </div>
-                </div>
-              </section>
-
-              <section class="page" id="settings">
-                <h2>Setting</h2>
-                <div class="panel">
-                  <div class="item">Renderer Cuality</div>
-                  <div class="item">Custome controller</div>
-                  <div class="item">mouse setting</div>
-                  <div class="item">Background</div>
-                  <div class="item">Tentang</div>
-                </div>
-              </section>
-
-              <section class="page" id="about">
-                <h2>Tentang</h2>
-                <div class="panel">
-                  <p>AUTHER Launcher V0.1</p>
-                  <p>Dibuat oleh</p>
-                  <b>YuzeeCraft</b>
-                  <p><a style="color:#f55" href="https://whatsapp.com/channel/0029VbEhRzO4IBhBLF0U5K0t">Cek pembaruan</a></p>
-                </div>
-              </section>
-            </main>
-          </div>
-
-          <div class="loading" id="loading">
-            O • Tunggu logo mojang muncul
-          </div>
-
-          <script>
-          let currentCategory='Version & Loader';
-          let currentAccount='';
-
-          document.addEventListener('mousemove',e=>{
-            const c=document.getElementById('cursor');
-            c.style.left=e.clientX+'px';
-            c.style.top=e.clientY+'px';
-          });
-
-          function page(id,btn){
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            document.querySelectorAll('aside .nav').forEach(b=>b.classList.remove('active'));
-            if(btn)btn.classList.add('active');
-          }
-
-          function category(name){
-            currentCategory=name;
-            document.getElementById('categoryTitle').textContent=name;
-            document.getElementById('catalog').textContent=
-              name==='Installed'?'Versi terpasang akan ditampilkan di sini.':
-              'Pilih dan cari '+name+'. Katalog dan instalasi nyata memerlukan integrasi sumber dan penyimpanan native.';
-          }
-
-          function resetCatalog(){category(currentCategory)}
-          function nextCatalog(){category(currentCategory)}
-
-          function accountType(type){
-            currentAccount=type;
-            let html='';
-            if(type==='offline'){
-              html='<h3>Offline account</h3>'+
-              '<div class="field"><label>Name :</label>'+
-              '<input id="playerName" placeholder="Masukkan nama" maxlength="16">'+
-              '<div class="muted">Minimal 3–16 karakter</div></div>'+
-              '<div class="center"><button onclick="offlineLogin()">Masuk</button></div>';
-            }else if(type==='ely'){
-              html='<h3>Ely.by account</h3>'+
-              '<div class="field"><label>Email :</label><input id="elyEmail" type="email" placeholder="Masukkan email"></div>'+
-              '<div class="field"><label>Password :</label><input id="elyPassword" type="password" placeholder="Masukkan Password"></div>'+
-              '<div class="center"><button onclick="elyLogin()">Masuk</button></div>';
-            }else{
-              html='<h3>Microsoft account</h3>'+
-              '<div class="field"><label>Email :</label><input id="msEmail" type="email" placeholder="Masukkan email"></div>'+
-              '<div class="field"><label>Password :</label><input id="msPassword" type="password" placeholder="Masukkan Password"></div>'+
-              '<div class="center"><button onclick="msLogin()">Masuk</button></div>'+
-              '<p class="muted">Login Microsoft harus diselesaikan melalui autentikasi resmi Microsoft.</p>';
-            }
-            document.getElementById('accountForm').innerHTML=html;
-          }
-
-          function offlineLogin(){
-            const name=document.getElementById('playerName').value.trim();
-            if(!/^[A-Za-z0-9_]{3,16}$/.test(name)){
-              alert('Nama harus 3–16 karakter: huruf, angka, atau garis bawah.');
-              return;
-            }
-            alert('Profil offline dibuat: '+name);
-          }
-
-          function elyLogin(){
-            alert('Login Ely.by belum terhubung ke layanan autentikasi.');
-          }
-
-          function msLogin(){
-            alert('Login Microsoft resmi OAuth belum diintegrasikan.');
-          }
-
-          function playGame(){
-            document.getElementById('loading').classList.add('show');
-            setTimeout(()=>{
-              document.getElementById('loading').classList.remove('show');
-              document.getElementById('playStatus').textContent=
-                'Minecraft Java Runtime belum terintegrasi. Game belum dapat dijalankan.';
-            },1800);
-          }
-          </script>
-          </body>
-          </html>
           EOF
 
       - name: Build APK
-        run: |
-          gradle wrapper --gradle-version 8.9
-          chmod +x gradlew
-          ./gradlew assembleDebug
+        run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Upload AUTHER Launcher APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-V0.1
+          name: AUTHER-LAUNCHER-V0.1
           path: app/build/outputs/apk/debug/app-debug.apk
