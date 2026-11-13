@@ -24,25 +24,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # EXTRACT PROJECT ZIP
+      # EXTRACT PROJECT
       - name: Extract AUTHER Project
         shell: bash
         run: |
           set -e
-
-          ZIP_FILE="AutherLauncher_0.1.zip"
-
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP project tidak ditemukan"
-            find . -maxdepth 3 -type f
-            exit 1
-          fi
-
           mkdir -p extracted
-          unzip -o "$ZIP_FILE" -d extracted
-
-          echo "Isi project:"
-          find extracted -maxdepth 4 -type f | head -100
+          unzip -o AutherLauncher_0.1.zip -d extracted
+          echo "Project berhasil diekstrak"
 
       # ANDROID SDK
       - name: Setup Android SDK
@@ -50,26 +39,18 @@ jobs:
         run: |
           set -e
           SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-
           echo "ANDROID_HOME=$SDK_PATH" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_PATH" >> "$GITHUB_ENV"
           echo "$SDK_PATH/platform-tools" >> "$GITHUB_PATH"
-
           test -d "$SDK_PATH"
 
       - name: Locate SDK Manager
         shell: bash
         run: |
           set -e
-
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
             -name sdkmanager -type f | head -n 1)
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "SDK Manager tidak ditemukan"
-            exit 1
-          fi
-
+          test -n "$SDKMANAGER"
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
 
       - name: Accept Android Licenses
@@ -92,27 +73,13 @@ jobs:
           test -d "$ANDROID_HOME/platforms/android-35"
           echo "ANDROID SDK READY"
 
-      # FIND EXTRACTED PROJECT
-      - name: Find AUTHER Gradle Project
+      # FIND PROJECT
+      - name: Find AUTHER Project
         shell: bash
         run: |
           set -e
 
-          GRADLEW=$(find extracted -type f \
-            -name gradlew -print -quit)
-
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew tidak ditemukan di dalam ZIP"
-            echo "Daftar file project:"
-            find extracted -maxdepth 5 -type f | head -150
-            exit 1
-          fi
-
-          PROJECT_DIR="${GRADLEW%/gradlew}"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Project ditemukan: $PROJECT_DIR"
+          PROJECT_DIR="extracted/AutherLauncher"
 
           test -f "$PROJECT_DIR/settings.gradle" || \
           test -f "$PROJECT_DIR/settings.gradle.kts"
@@ -120,19 +87,38 @@ jobs:
           test -f "$PROJECT_DIR/app/build.gradle" || \
           test -f "$PROJECT_DIR/app/build.gradle.kts"
 
-      # BUILD APK
-      - name: Prepare Gradle
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: chmod +x gradlew
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "AUTHER PROJECT FOUND"
 
-      - name: Build AUTHER Launcher APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: ./gradlew --no-daemon assembleDebug --stacktrace
+      # INSTALL GRADLE WITHOUT WRAPPER
+      - name: Setup Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Verify Gradle
+        run: gradle --version
+
+      # BUILD APK
+      - name: Build AUTHER Launcher
+        working-directory: extracted/AutherLauncher
+        shell: bash
+        run: |
+          gradle --no-daemon assembleDebug --stacktrace
+
+      # CHECK APK
+      - name: Check APK
+        shell: bash
+        run: |
+          find extracted/AutherLauncher/app/build/outputs/apk \
+            -name "*.apk" -type f
+          test -n "$(find extracted/AutherLauncher/app/build/outputs/apk/debug \
+            -name '*.apk' -type f -print -quit)"
 
       # UPLOAD APK
       - name: Upload AUTHER APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-Launcher-V0.1
-          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          path: extracted/AutherLauncher/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
