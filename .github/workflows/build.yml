@@ -1,5 +1,5 @@
 
-name: Build AUTHER Launcher V0.1
+name: Test AUTHER Launcher V0.1
 
 on:
   workflow_dispatch:
@@ -11,43 +11,38 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test-build:
+    name: Build and Test AUTHER
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      # ANDROID SDK SETUP
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Prepare Android SDK
+      - name: Prepare SDK
         shell: bash
         run: |
-          set -e
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
-          mkdir -p "$ANDROID_HOME"
-
-          sdkmanager --sdk_root="$ANDROID_HOME" --version
-
-      - name: Accept Android SDK Licenses
+      - name: Accept SDK Licenses
         shell: bash
         run: |
           set +o pipefail
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
           set -o pipefail
 
-      - name: Install Android SDK Packages
+      - name: Install SDK Packages
         shell: bash
         run: |
           sdkmanager --sdk_root="$ANDROID_HOME" \
@@ -55,35 +50,36 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Verify Android SDK
-        shell: bash
+      - name: Verify SDK
         run: |
-          test -d "$ANDROID_HOME/platforms/android-35"
-          test -d "$ANDROID_HOME/build-tools/35.0.0"
+          java -version
+          sdkmanager --version
           adb version
-          echo "ANDROID SDK READY"
 
-      # CHECK PROJECT
-      - name: Check Android Project
-        shell: bash
+      - name: Check Project Files
         run: |
           test -f gradlew
           test -f settings.gradle || test -f settings.gradle.kts
           test -f app/build.gradle || test -f app/build.gradle.kts
 
-      # GRADLE
-      - name: Grant Gradle Permission
+      - name: Setup Gradle
         run: chmod +x gradlew
 
-      - name: Build AUTHER Launcher Debug APK
+      - name: Test Gradle Configuration
+        run: ./gradlew tasks --stacktrace
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Check APK
         shell: bash
         run: |
-          ./gradlew --no-daemon assembleDebug --stacktrace
+          find app/build/outputs/apk -name "*.apk" -type f
+          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)"
 
-      # UPLOAD APK
-      - name: Upload AUTHER Launcher APK
+      - name: Upload Test APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-V0.1
+          name: AUTHER-Launcher-V0.1-TEST
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
