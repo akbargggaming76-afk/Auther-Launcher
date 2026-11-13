@@ -24,6 +24,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # ANDROID SDK
       - name: Setup Android SDK
         shell: bash
         run: |
@@ -32,61 +33,83 @@ jobs:
           echo "ANDROID_HOME=$SDK_PATH" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_PATH" >> "$GITHUB_ENV"
           echo "$SDK_PATH/platform-tools" >> "$GITHUB_PATH"
-          echo "SDK PATH: $SDK_PATH"
           test -d "$SDK_PATH"
 
       - name: Locate SDK Manager
         shell: bash
         run: |
           set -e
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)"
-          if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager tidak ditemukan"
-            exit 1
-          fi
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
+            -name sdkmanager -type f 2>/dev/null | head -n 1)"
+          test -n "$SDKMANAGER"
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
-          echo "SDK Manager ditemukan"
 
-      - name: Accept Android Licenses
+      - name: Accept SDK Licenses
         shell: bash
         run: |
-          set -e
           set +o pipefail
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
           set -o pipefail
 
-      - name: Install Android SDK Packages
-        shell: bash
+      - name: Install SDK Packages
         run: |
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Verify Android SDK
-        shell: bash
+      - name: Verify SDK
         run: |
-          test -d "$ANDROID_HOME/platforms/android-35"
-          test -d "$ANDROID_HOME/build-tools/35.0.0"
           adb version
+          test -d "$ANDROID_HOME/platforms/android-35"
           echo "ANDROID SDK READY"
 
-      - name: Check Android Project
+      # FIND PROJECT AUTOMATICALLY
+      - name: Find Android Project
         shell: bash
         run: |
-          test -f gradlew
-          test -f settings.gradle || test -f settings.gradle.kts
-          test -f app/build.gradle || test -f app/build.gradle.kts
+          set -e
 
+          echo "Mencari Gradle project..."
+
+          GRADLEW=$(find . -type f -name gradlew \
+            -not -path './.git/*' -print -quit)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew tidak ditemukan."
+            echo "Project Android atau Gradle Wrapper belum tersedia."
+            find . -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+
+          PROJECT_DIR="${GRADLEW%/gradlew}"
+
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR="."
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project ditemukan: $PROJECT_DIR"
+
+          test -f "$PROJECT_DIR/settings.gradle" || \
+          test -f "$PROJECT_DIR/settings.gradle.kts"
+
+          test -f "$PROJECT_DIR/app/build.gradle" || \
+          test -f "$PROJECT_DIR/app/build.gradle.kts"
+
+      # BUILD
       - name: Grant Gradle Permission
+        working-directory: ${{ env.PROJECT_DIR }}
         run: chmod +x gradlew
 
       - name: Build AUTHER Launcher
+        working-directory: ${{ env.PROJECT_DIR }}
         run: ./gradlew --no-daemon assembleDebug --stacktrace
 
-      - name: Upload APK
+      # UPLOAD APK
+      - name: Upload AUTHER APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-Launcher-V0.1
-          path: app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
