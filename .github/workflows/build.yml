@@ -4,18 +4,17 @@ name: Build AUTHER Launcher V0.1 APK
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,6 +28,7 @@ jobs:
       - name: Create Android project
         run: |
           mkdir -p app/src/main/java/com/auther/launcher
+          mkdir -p app/src/main/assets
           mkdir -p app/src/main/res/values
 
           cat > settings.gradle <<'EOF'
@@ -84,11 +84,10 @@ jobs:
           <resources>
               <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
                   <item name="android:fontFamily">sans</item>
-                  <item name="android:colorAccent">#FF3030</item>
-                  <item name="android:windowLightStatusBar">false</item>
-                  <item name="android:statusBarColor">#101010</item>
-                  <item name="android:navigationBarColor">#101010</item>
-                  <item name="android:windowBackground">#101010</item>
+                  <item name="android:colorAccent">#E53935</item>
+                  <item name="android:statusBarColor">#080808</item>
+                  <item name="android:navigationBarColor">#080808</item>
+                  <item name="android:windowBackground">#080808</item>
               </style>
           </resources>
           EOF
@@ -96,13 +95,15 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
               <application
                   android:theme="@style/AppTheme"
                   android:label="AUTHER Launcher"
-                  android:allowBackup="true">
+                  android:usesCleartextTraffic="false">
                   <activity
                       android:name=".MainActivity"
                       android:screenOrientation="landscape"
+                      android:configChanges="orientation|screenSize"
                       android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
@@ -118,272 +119,407 @@ jobs:
 
           import android.app.*;
           import android.os.*;
-          import android.graphics.Color;
-          import android.view.*;
-          import android.widget.*;
+          import android.webkit.*;
           import android.content.*;
-          import android.graphics.Typeface;
+          import java.io.File;
+          import java.net.URL;
+          import java.util.HashSet;
+          import java.util.Set;
 
           public class MainActivity extends Activity {
-              LinearLayout root, content;
-              android.content.SharedPreferences prefs;
-
-              int bg = Color.rgb(16,16,16);
-              int red = Color.rgb(210,35,35);
-              int white = Color.WHITE;
-              int gray = Color.rgb(160,160,160);
-
-              String[] resolutions = {"50","60","75","85","90","100"};
-              String[] descriptions = {
-                  "Sangat High dan cukup Buram",
-                  "High dan Buram sedang",
-                  "Sangat sedang",
-                  "Sedang",
-                  "Cukup bagus",
-                  "Bagus dan HD"
-              };
+              WebView web;
 
               @Override
               public void onCreate(Bundle b) {
                   super.onCreate(b);
+
                   getWindow().getDecorView().setSystemUiVisibility(
-                      View.SYSTEM_UI_FLAG_FULLSCREEN |
-                      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                      4 | 1024 | 4096 | 512
                   );
-                  prefs = getSharedPreferences("auther_settings", MODE_PRIVATE);
-                  showHome();
+
+                  web = new WebView(this);
+                  web.setBackgroundColor(0xFF080808);
+
+                  WebSettings settings = web.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+
+                  web.addJavascriptInterface(new Bridge(), "Android");
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
               }
 
-              TextView text(String value, int size) {
-                  TextView t = new TextView(this);
-                  t.setText(value);
-                  t.setTextColor(white);
-                  t.setTextSize(size);
-                  t.setPadding(12,10,12,10);
-                  return t;
-              }
+              public class Bridge {
+                  @JavascriptInterface
+                  public void download(String address, String category,
+                                       String filename) {
+                      runOnUiThread(() -> {
+                          try {
+                              URL url = new URL(address);
+                              String host = url.getHost();
 
-              void setup(String title) {
-                  root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setBackgroundColor(bg);
+                              boolean allowed =
+                                  host.equals("cdn.modrinth.com") ||
+                                  host.equals("modrinth.com") ||
+                                  host.equals("piston-meta.mojang.com") ||
+                                  host.equals("launchermeta.mojang.com");
 
-                  TextView heading = text(title,23);
-                  heading.setTypeface(null,Typeface.BOLD);
-                  heading.setTextColor(red);
-                  root.addView(heading);
+                              if (!url.getProtocol().equals("https") ||
+                                  !allowed) {
+                                  send("URL unduhan tidak diizinkan.");
+                                  return;
+                              }
 
-                  ScrollView scroll = new ScrollView(this);
-                  content = new LinearLayout(this);
-                  content.setOrientation(LinearLayout.VERTICAL);
-                  content.setPadding(20,12,20,20);
-                  scroll.addView(content);
-                  root.addView(scroll,new LinearLayout.LayoutParams(
-                      -1,0,1
-                  ));
+                              String safeCategory =
+                                  category.replaceAll("[^a-zA-Z0-9_-]", "");
 
-                  LinearLayout nav = new LinearLayout(this);
-                  nav.setOrientation(LinearLayout.HORIZONTAL);
-                  addNav(nav,"Home",()->showHome());
-                  addNav(nav,"Download",()->showDownload());
-                  addNav(nav,"Account",()->showAccount());
-                  addNav(nav,"Setting",()->showSettings());
-                  root.addView(nav);
-                  setContentView(root);
-              }
+                              String safeName =
+                                  filename.replaceAll("[^a-zA-Z0-9._-]", "_");
 
-              void addNav(LinearLayout parent,String label,Runnable action) {
-                  Button b = new Button(this);
-                  b.setText(label);
-                  b.setTextColor(white);
-                  b.setBackgroundTintList(
-                      android.content.res.ColorStateList.valueOf(red)
-                  );
-                  parent.addView(b,new LinearLayout.LayoutParams(0,55,1));
-                  b.setOnClickListener(v->action.run());
-              }
+                              if (safeName.isEmpty()) {
+                                  safeName = "download.bin";
+                              }
 
-              void addText(String s,int size) {
-                  content.addView(text(s,size));
-              }
+                              File base = new File(
+                                  getExternalFilesDir(null),
+                                  ".minecraft/Versi/Belum dipilih/loader belum dipilih"
+                              );
 
-              void addButton(String label,Runnable action) {
-                  Button b = new Button(this);
-                  b.setText(label);
-                  b.setTextColor(white);
-                  b.setBackgroundTintList(
-                      android.content.res.ColorStateList.valueOf(red)
-                  );
-                  content.addView(b);
-                  b.setOnClickListener(v->action.run());
-              }
+                              File folder = new File(base, safeCategory);
+                              if (!folder.exists() && !folder.mkdirs()) {
+                                  send("Folder penyimpanan gagal dibuat.");
+                                  return;
+                              }
 
-              void showHome() {
-                  setup("AUTHER LAUNCHER");
-                  content.setGravity(Gravity.CENTER);
-                  addText("Minecraft Java Launcher",20);
-                  addButton("PLAY",()->new AlertDialog.Builder(this)
-                      .setMessage("Minecraft Java runtime belum terintegrasi.")
-                      .setPositiveButton("OK",null).show());
-                  addText("V0.1",14);
-              }
+                              DownloadManager.Request request =
+                                  new DownloadManager.Request(
+                                      android.net.Uri.parse(address)
+                                  );
 
-              void showDownload() {
-                  setup("Download");
-                  addButton("Version & Loader",()->message("Katalog versi belum terhubung."));
-                  addButton("Mods",()->message("Katalog mod belum terhubung."));
-                  addButton("Shader",()->message("Katalog shader belum terhubung."));
-                  addButton("Worlds",()->message("Impor dunia belum tersedia."));
-                  addButton("Installed",()->message("Belum ada daftar instalasi."));
-              }
+                              request.setTitle(safeName);
+                              request.setDescription("AUTHER Launcher");
+                              request.setNotificationVisibility(
+                                  DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                              );
+                              request.setDestinationUri(
+                                  android.net.Uri.fromFile(
+                                      new File(folder, safeName)
+                                  )
+                              );
 
-              void showAccount() {
-                  setup("Account");
-                  addText("Pilih jenis akun",18);
-                  addButton("Offline",()->message("Login Offline belum diintegrasikan."));
-                  addButton("Ely.by",()->message("Login Ely.by belum diintegrasikan."));
-                  addButton("Microsoft",()->message("Login Microsoft belum diintegrasikan."));
-              }
+                              DownloadManager manager =
+                                  (DownloadManager)getSystemService(
+                                      DOWNLOAD_SERVICE
+                                  );
 
-              void showSettings() {
-                  setup("Setting");
-                  addButton("Renderer Cuality",()->showQuality());
-                  addButton("Custome controller",()->message("Pengaturan controller belum terhubung ke game."));
-                  addButton("mouse setting",()->message("Pengaturan mouse belum terhubung ke game."));
-                  addButton("Background",()->message("Pengaturan background."));
-                  addButton("Tentang",()->showAbout());
-              }
+                              manager.enqueue(request);
+                              send("Unduhan dimulai: " + safeName);
 
-              void showQuality() {
-                  setup("Cuality");
-
-                  addText("Runtime",18);
-                  String[] runtimes = {"25","21","17","8"};
-                  String selectedRuntime = prefs.getString("runtime","17");
-
-                  RadioGroup runtimeGroup = new RadioGroup(this);
-                  runtimeGroup.setOrientation(RadioGroup.HORIZONTAL);
-
-                  for(String r : runtimes) {
-                      RadioButton rb = new RadioButton(this);
-                      rb.setText(r);
-                      rb.setTextColor(white);
-                      rb.setButtonTintList(
-                          android.content.res.ColorStateList.valueOf(red)
-                      );
-                      runtimeGroup.addView(rb);
-                      if(r.equals(selectedRuntime)) rb.setChecked(true);
+                          } catch(Exception e) {
+                              send("Gagal memulai unduhan: " + e.getMessage());
+                          }
+                      });
                   }
 
-                  runtimeGroup.setOnCheckedChangeListener((g,id)->{
-                      RadioButton selected = findViewById(id);
-                      if(selected != null)
-                          prefs.edit().putString(
-                              "runtime",selected.getText().toString()
-                          ).apply();
-                  });
-                  content.addView(runtimeGroup);
+                  @JavascriptInterface
+                  public String getStoragePath() {
+                      return new File(
+                          getExternalFilesDir(null), ".minecraft"
+                      ).getAbsolutePath();
+                  }
 
-                  addText("Memory",18);
-
-                  int[] memoryValues = {140,1024,1045,2042};
-                  String[] memoryLabels = {"1gb","2gb","3gb","4gb"};
-                  int savedMemory = prefs.getInt("memory",1024);
-
-                  TextView memoryNumber = text(
-                      String.valueOf(savedMemory),18
-                  );
-                  content.addView(memoryNumber);
-
-                  SeekBar memorySlider = new SeekBar(this);
-                  memorySlider.setMax(3);
-                  int initial = 1;
-                  for(int i=0;i<memoryValues.length;i++)
-                      if(memoryValues[i] == savedMemory) initial=i;
-                  memorySlider.setProgress(initial);
-                  content.addView(memorySlider);
-
-                  TextView memoryChoices = text(
-                      "1gb       2gb       3gb       4gb",14
-                  );
-                  content.addView(memoryChoices);
-
-                  memorySlider.setOnSeekBarChangeListener(
-                      new SeekBar.OnSeekBarChangeListener() {
-                          public void onProgressChanged(SeekBar s,int p,boolean u) {
-                              memoryNumber.setText(
-                                  String.valueOf(memoryValues[p])
-                              );
-                              prefs.edit().putInt("memory",memoryValues[p]).apply();
-                          }
-                          public void onStartTrackingTouch(SeekBar s) {}
-                          public void onStopTrackingTouch(SeekBar s) {}
-                      }
-                  );
-
-                  addText("Tampilan resolusi",18);
-
-                  int savedResolution = prefs.getInt("resolution",100);
-                  int index = 5;
-                  for(int i=0;i<resolutions.length;i++)
-                      if(Integer.parseInt(resolutions[i]) == savedResolution)
-                          index=i;
-
-                  TextView description = text(descriptions[index],16);
-                  content.addView(description);
-
-                  SeekBar resolutionSlider = new SeekBar(this);
-                  resolutionSlider.setMax(5);
-                  resolutionSlider.setProgress(index);
-                  content.addView(resolutionSlider);
-
-                  TextView choices = text(
-                      "50       60       75       85       90       100",16
-                  );
-                  content.addView(choices);
-
-                  resolutionSlider.setOnSeekBarChangeListener(
-                      new SeekBar.OnSeekBarChangeListener() {
-                          public void onProgressChanged(SeekBar s,int p,boolean u) {
-                              description.setText(descriptions[p]);
-                              prefs.edit().putInt(
-                                  "resolution",
-                                  Integer.parseInt(resolutions[p])
-                              ).apply();
-                          }
-                          public void onStartTrackingTouch(SeekBar s) {}
-                          public void onStopTrackingTouch(SeekBar s) {}
-                      }
-                  );
+                  void send(String message) {
+                      final String safe = message
+                          .replace("\\", "\\\\")
+                          .replace("'", "\\'")
+                          .replace("\n", " ");
+                      web.evaluateJavascript(
+                          "showMessage('" + safe + "')", null
+                      );
+                  }
               }
 
-              void showAbout() {
-                  setup("Tentang");
-                  addText("v0.1     cek pembaruan",17);
-                  addText("Dibuat oleh",17);
-                  addText("YuzeeCraft",17);
-                  addButton("Cek pembaruan",()->{
-                      Intent i = new Intent(Intent.ACTION_VIEW,
-                          android.net.Uri.parse(
-                              "https://whatsapp.com/channel/0029VbEhRzO4IBhBLF0U5K0t"
-                          ));
-                      startActivity(i);
-                  });
-              }
-
-              void message(String msg) {
-                  new AlertDialog.Builder(this)
-                      .setMessage(msg)
-                      .setPositiveButton("OK",null).show();
+              @Override
+              public void onBackPressed() {
+                  web.evaluateJavascript(
+                      "goBack()", null
+                  );
               }
           }
+          EOF
+
+          cat > app/src/main/assets/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="id">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>AUTHER Launcher</title>
+          <style>
+          *{box-sizing:border-box}
+          body{margin:0;background:#080808;color:white;font-family:Arial}
+          header{color:#e53935;font-size:25px;font-weight:bold;padding:15px}
+          main{padding:12px 4%;height:82vh;overflow:auto}
+          button,select,input{
+            background:#741313;color:white;border:0;border-radius:4px;
+            padding:13px;margin:5px;font-size:15px
+          }
+          button{cursor:pointer}
+          button:active{background:#e53935}
+          .wide{width:98%;display:block;margin:12px 1%}
+          .item{background:#171717;border:1px solid #501111;
+            padding:12px;margin:8px 0;border-radius:5px}
+          .item button{float:right}
+          .nav{position:fixed;bottom:5px;left:2%;width:96%;
+            display:flex;gap:5px}
+          .nav button{flex:1;margin:0}
+          .hidden{display:none}
+          .muted{color:#aaa;font-size:13px}
+          #message{color:#ff7777;padding:10px}
+          </style>
+          </head>
+          <body>
+          <header id="heading">AUTHER Launcher</header>
+          <main>
+          <section id="home">
+            <h2>AUTHER LAUNCHER</h2>
+            <button class="wide" onclick="show('download')">DOWNLOAD</button>
+            <p>AUTHER Launcher V0.1</p>
+          </section>
+
+          <section id="download" class="hidden">
+            <button class="wide" onclick="show('versions')">VERSION & LOADER</button>
+            <button class="wide" onclick="show('mods')">MODS</button>
+            <button class="wide" onclick="show('shaders')">SHADER</button>
+            <button class="wide" onclick="show('worlds')">WORLDS</button>
+            <button class="wide" onclick="show('installed')">INSTALLED</button>
+          </section>
+
+          <section id="versions" class="hidden">
+            <button onclick="show('download')">Kembali</button>
+            <h3>Version & Loader</h3>
+            <select id="versionType" onchange="loadVersions()">
+              <option value="release">Release</option>
+              <option value="snapshot">Snapshot</option>
+              <option value="old_beta">Beta</option>
+              <option value="old_alpha">Alpha</option>
+            </select>
+            <div id="versionList">Memuat versi Mojang...</div>
+            <h3>Loader</h3>
+            <select id="loader">
+              <option>Vanilla</option>
+              <option>Fabric</option>
+              <option>Forge</option>
+              <option>OptiFine</option>
+            </select>
+            <div class="muted">
+              Daftar versi diambil dari Mojang. Pengunduhan metadata
+              belum memasang seluruh game atau loader.
+            </div>
+          </section>
+
+          <section id="mods" class="hidden">
+            <button onclick="show('download')">Kembali</button>
+            <h3>Mods</h3>
+            <input id="modSearch" placeholder="Telusuri mod">
+            <button onclick="searchProjects('mod',0)">Cari</button>
+            <select id="modLoader">
+              <option value="">Semua loader</option>
+              <option value="fabric">Fabric</option>
+              <option value="forge">Forge</option>
+              <option value="neoforge">NeoForge</option>
+            </select>
+            <div id="modList"></div>
+            <button onclick="searchProjects('mod',page.mod+6)">Next</button>
+            <button onclick="searchProjects('mod',0)">Remove</button>
+          </section>
+
+          <section id="shaders" class="hidden">
+            <button onclick="show('download')">Kembali</button>
+            <h3>Shader</h3>
+            <input id="shaderSearch" placeholder="Telusuri shader">
+            <button onclick="searchProjects('shader',0)">Cari</button>
+            <div id="shaderList"></div>
+            <button onclick="searchProjects('shader',page.shader+6)">Next</button>
+            <button onclick="searchProjects('shader',0)">Remove</button>
+          </section>
+
+          <section id="worlds" class="hidden">
+            <button onclick="show('download')">Kembali</button>
+            <h3>Worlds</h3>
+            <p>Impor dunia ZIP perlu pemilih file Android dan belum
+            diaktifkan pada build ini.</p>
+          </section>
+
+          <section id="installed" class="hidden">
+            <button onclick="show('download')">Kembali</button>
+            <h3>Installed</h3>
+            <p>Unduhan disimpan di:</p>
+            <p id="path"></p>
+            <p class="muted">Periksa folder melalui penyimpanan aplikasi.</p>
+          </section>
+
+          <section id="account" class="hidden">
+            <h3>Account</h3>
+            <p>Login belum diintegrasikan.</p>
+          </section>
+
+          <section id="setting" class="hidden">
+            <h3>Setting</h3>
+            <p>Pengaturan launcher.</p>
+          </section>
+
+          <div id="message"></div>
+          </main>
+
+          <div class="nav">
+            <button onclick="show('home')">HOME</button>
+            <button onclick="show('download')">DOWNLOAD</button>
+            <button onclick="show('account')">ACCOUNT</button>
+            <button onclick="show('setting')">SETTING</button>
+          </div>
+
+          <script>
+          const page={mod:0,shader:0};
+          let manifest=null;
+
+          function show(id){
+            document.querySelectorAll('main section').forEach(
+              s=>s.classList.add('hidden')
+            );
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById('heading').textContent =
+              id==='home'?'AUTHER Launcher':id.toUpperCase();
+            if(id==='versions')loadVersions();
+            if(id==='mods')searchProjects('mod',0);
+            if(id==='shaders')searchProjects('shader',0);
+            if(id==='installed'){
+              document.getElementById('path').textContent=
+                Android.getStoragePath();
+            }
+          }
+
+          function showMessage(s){
+            document.getElementById('message').textContent=s;
+          }
+
+          function goBack(){show('download')}
+
+          async function loadVersions(){
+            const box=document.getElementById('versionList');
+            box.textContent='Mengambil daftar versi Mojang...';
+            try{
+              if(!manifest){
+                const r=await fetch(
+                  'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
+                );
+                if(!r.ok)throw new Error('HTTP '+r.status);
+                manifest=await r.json();
+              }
+              const type=document.getElementById('versionType').value;
+              const list=manifest.versions.filter(v=>v.type===type);
+              box.innerHTML='';
+              list.forEach(v=>{
+                const div=document.createElement('div');
+                div.className='item';
+                const name=document.createElement('b');
+                name.textContent=v.id+' ('+v.releaseTime.slice(0,10)+')';
+                const btn=document.createElement('button');
+                btn.textContent='Unduh JSON';
+                btn.onclick=()=>Android.download(
+                  v.url,'versions',v.id+'.json'
+                );
+                div.append(name,btn);
+                box.appendChild(div);
+              });
+              if(!list.length)box.textContent='Tidak ada versi pada kategori ini.';
+            }catch(e){
+              box.textContent='Gagal mengambil versi: '+e.message;
+            }
+          }
+
+          async function searchProjects(type,offset){
+            page[type]=offset;
+            const isMod=type==='mod';
+            const query=document.getElementById(
+              isMod?'modSearch':'shaderSearch'
+            ).value;
+            const loader=isMod?
+              document.getElementById('modLoader').value:'';
+            const box=document.getElementById(
+              isMod?'modList':'shaderList'
+            );
+            box.textContent='Mengambil katalog Modrinth...';
+
+            try{
+              const projectType=isMod?'mod':'shader';
+              const facets=[[`project_type:${projectType}`]];
+              if(loader)facets.push([`categories:${loader}`]);
+              const params=new URLSearchParams({
+                query:query,
+                facets:JSON.stringify(facets),
+                limit:'6',
+                offset:String(offset)
+              });
+              const r=await fetch(
+                'https://api.modrinth.com/v2/search?'+params
+              );
+              if(!r.ok)throw new Error('HTTP '+r.status);
+              const data=await r.json();
+              box.innerHTML='';
+              data.hits.forEach(project=>{
+                const div=document.createElement('div');
+                div.className='item';
+                const name=document.createElement('b');
+                name.textContent=project.title;
+                const desc=document.createElement('p');
+                desc.className='muted';
+                desc.textContent=project.description;
+                const btn=document.createElement('button');
+                btn.textContent='Instal';
+                btn.onclick=()=>downloadProject(project);
+                div.append(name,desc,btn);
+                box.appendChild(div);
+              });
+              if(!data.hits.length)box.textContent='Tidak ada hasil.';
+            }catch(e){
+              box.textContent='Gagal mengambil katalog: '+e.message;
+            }
+          }
+
+          async function downloadProject(project){
+            try{
+              const r=await fetch(
+                'https://api.modrinth.com/v2/project/'+
+                encodeURIComponent(project.project_id)+'/version'
+              );
+              if(!r.ok)throw new Error('HTTP '+r.status);
+              const versions=await r.json();
+              if(!versions.length)throw new Error('File belum tersedia.');
+
+              const version=versions[0];
+              const file=version.files.find(f=>f.primary)||version.files[0];
+              if(!file)throw new Error('File unduhan tidak ditemukan.');
+
+              const category=project.project_type==='shader'
+                ?'shaderpacks':'mods';
+
+              Android.download(file.url,category,file.filename);
+            }catch(e){
+              showMessage('Gagal: '+e.message);
+            }
+          }
+
+          show('home');
+          </script>
+          </body>
+          </html>
           EOF
 
       - name: Build APK
         run: gradle assembleDebug
 
-      - name: Upload AUTHER Launcher APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-LAUNCHER-V0.1
