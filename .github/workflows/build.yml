@@ -27,17 +27,338 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK Platform
+      - name: Install Android SDK Packages
         run: |
           sdkmanager --install \
+            "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Accept Android SDK Licenses
+      - name: Create AUTHER Android Project
         run: |
-          set +o pipefail
-          yes | sdkmanager --licenses
-          set -o pipefail
+          mkdir -p app/src/main/java/com/auther/launcher
+          mkdir -p app/src/main/assets
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = 'AUTHER-Launcher'
+          include ':app'
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.auther.launcher'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.auther.launcher'
+                  minSdk 26
+                  targetSdk 28
+                  versionCode 1
+                  versionName '0.1'
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
+                  android:label="AUTHER Launcher"
+                  android:usesCleartextTraffic="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="landscape"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/auther/launcher/MainActivity.java <<'EOF'
+          package com.auther.launcher;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebChromeClient;
+          import android.annotation.SuppressLint;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+
+              @SuppressLint("SetJavaScriptEnabled")
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  webView = new WebView(this);
+                  webView.getSettings().setJavaScriptEnabled(true);
+                  webView.getSettings().setDomStorageEnabled(true);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient());
+
+                  setContentView(webView);
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          EOF
+
+          cat > app/src/main/assets/index.html <<'EOF'
+          <html>
+          <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta charset="UTF-8">
+          <title>AUTHER Launcher</title>
+
+          <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            background: #100d12;
+            color: white;
+            font-family: Arial, sans-serif;
+          }
+          header {
+            padding: 18px 25px;
+            background: #260d14;
+            border-bottom: 2px solid #e52b43;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .logo {
+            color: #ff4058;
+            font-size: 23px;
+            font-weight: bold;
+            letter-spacing: 2px;
+          }
+          nav {
+            display: flex;
+            gap: 8px;
+          }
+          button {
+            cursor: pointer;
+            border: 0;
+            border-radius: 8px;
+            padding: 12px 18px;
+            color: white;
+            background: #39232c;
+            font-weight: bold;
+          }
+          button:active { opacity: .7; }
+          nav button.active, .play {
+            background: #e52b43;
+          }
+          main {
+            padding: 25px;
+            min-height: 80vh;
+            background:
+              linear-gradient(90deg,rgba(15,5,10,.95),rgba(15,5,10,.45)),
+              linear-gradient(140deg,#531b2b,#171522 60%,#34212b);
+          }
+          .hero {
+            min-height: 330px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+          }
+          h1 {
+            font-size: 38px;
+            margin-bottom: 5px;
+          }
+          .subtitle { color: #c5b7bd; }
+          .play {
+            font-size: 19px;
+            padding: 15px 55px;
+            margin-top: 20px;
+          }
+          .version { color: #ff9aaa; margin-top: 15px; }
+          .panel { display: none; }
+          .panel.show { display: block; }
+          .items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(150px,1fr));
+            gap: 12px;
+            margin-top: 20px;
+          }
+          .item {
+            background: #251b23;
+            border: 1px solid #56303d;
+            padding: 20px;
+            border-radius: 12px;
+          }
+          .item button { margin-top: 12px; background: #b8213b; }
+          select {
+            background: #251b23;
+            color: white;
+            border: 1px solid #74404d;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+          }
+          </style>
+          </head>
+
+          <body>
+          <header>
+            <div class="logo">AUTHER LAUNCHER</div>
+            <nav>
+              <button class="active" onclick="showPage('home',this)">HOME</button>
+              <button onclick="showPage('download',this)">UNDUH</button>
+              <button onclick="showPage('settings',this)">SETTING</button>
+            </nav>
+          </header>
+
+          <main>
+            <section id="home" class="panel show">
+              <div class="hero">
+                <h1>AUTHER LAUNCHER</h1>
+                <div class="subtitle">Minecraft Java Launcher for Android</div>
+                <button class="play" onclick="playGame()">PLAY</button>
+                <div class="version" id="versionLabel">
+                  Minecraft belum diinstal
+                </div>
+              </div>
+            </section>
+
+            <section id="download" class="panel">
+              <h1>UNDUH</h1>
+              <p>Pilih kategori konten Minecraft.</p>
+              <div class="items">
+                <div class="item">Source All</div>
+                <div class="item">Version
+                  <select id="version">
+                    <option>1.21</option>
+                    <option>1.20.4</option>
+                    <option>1.19.4</option>
+                  </select>
+                  <select id="loader">
+                    <option>Vanilla</option>
+                    <option>Fabric</option>
+                    <option>Forge</option>
+                    <option>NeoForge</option>
+                    <option>Quilt</option>
+                  </select>
+                  <button onclick="installVersion()">INSTAL</button>
+                </div>
+                <div class="item">Mods</div>
+                <div class="item">Resource</div>
+                <div class="item">Shader</div>
+                <div class="item">Worlds</div>
+              </div>
+              <p id="installStatus"></p>
+            </section>
+
+            <section id="settings" class="panel">
+              <h1>SETTING</h1>
+              <div class="items">
+                <div class="item">
+                  Java Runtime
+                  <select>
+                    <option>Java 8</option>
+                    <option>Java 17</option>
+                    <option>Java 21</option>
+                    <option>Java 25</option>
+                  </select>
+                </div>
+                <div class="item">
+                  RAM Allocation
+                  <select>
+                    <option>1024 MB</option>
+                    <option>2048 MB</option>
+                    <option>4096 MB</option>
+                  </select>
+                </div>
+                <div class="item">Renderer: MobileGlues (belum terintegrasi)</div>
+              </div>
+            </section>
+          </main>
+
+          <script>
+          function showPage(id,button) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('show'));
+            document.getElementById(id).classList.add('show');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            button.classList.add('active');
+          }
+
+          function playGame() {
+            alert('Engine Minecraft Java belum terintegrasi. Runtime Java, library, aset, loader dan renderer masih perlu diintegrasikan.');
+          }
+
+          function installVersion() {
+            const version = document.getElementById('version').value;
+            const loader = document.getElementById('loader').value;
+            document.getElementById('installStatus').innerText =
+              'Pilihan: Minecraft ' + version + ' | ' + loader +
+              '. Sistem instalasi belum terintegrasi.';
+          }
+          </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Verify Gradle Project
+        run: |
+          test -f settings.gradle
+          test -f build.gradle
+          test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/assets/index.html
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -46,7 +367,7 @@ jobs:
 
       - name: Build AUTHER Launcher APK
         run: |
-          gradle --no-daemon assembleDebug
+          gradle --no-daemon --stacktrace assembleDebug
 
       - name: Upload AUTHER Launcher APK
         uses: actions/upload-artifact@v4
