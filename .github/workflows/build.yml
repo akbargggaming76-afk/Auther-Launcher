@@ -27,16 +27,31 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK Components
+      - name: Accept Android Licenses
+        shell: bash
         run: |
+          set +o pipefail
           yes | sdkmanager --licenses
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          set -o pipefail
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          sdkmanager --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Verify Android SDK
+        run: |
+          sdkmanager --version
+          adb version
 
       - name: Check Project
         run: |
-          test -f gradlew || (echo "gradlew tidak ditemukan" && exit 1)
-          test -f settings.gradle -o -f settings.gradle.kts || (echo "settings.gradle tidak ditemukan" && exit 1)
-          test -f app/build.gradle -o -f app/build.gradle.kts || (echo "app/build.gradle tidak ditemukan" && exit 1)
+          test -f gradlew
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
 
       - name: Build APK
         run: |
