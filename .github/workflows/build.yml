@@ -39,7 +39,6 @@ jobs:
               }
           }
           dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
                   google()
                   mavenCentral()
@@ -83,10 +82,10 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
                   android:theme="@android:style/Theme.Material.NoActionBar"
-                  android:label="AUTHER Launcher"
-                  android:usesCleartextTraffic="true">
+                  android:label="AUTHER Launcher">
                   <activity
                       android:name=".MainActivity"
+                      android:configChanges="orientation|screenSize"
                       android:screenOrientation="landscape"
                       android:exported="true">
                       <intent-filter>
@@ -103,31 +102,84 @@ jobs:
 
           import android.app.Activity;
           import android.os.Bundle;
+          import android.content.Intent;
+          import android.net.Uri;
           import android.webkit.WebView;
           import android.webkit.WebSettings;
-          import android.view.View;
-          import android.widget.FrameLayout;
+          import android.webkit.WebChromeClient;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebViewClient;
 
           public class MainActivity extends Activity {
+              private WebView webView;
+              private ValueCallback<Uri[]> fileCallback;
+              private static final int FILE_REQUEST = 1001;
+
               @Override
               protected void onCreate(Bundle state) {
                   super.onCreate(state);
 
                   getWindow().getDecorView().setSystemUiVisibility(
-                      View.SYSTEM_UI_FLAG_FULLSCREEN |
-                      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                      5894 | 1024 | 512 | 4096
                   );
 
-                  WebView web = new WebView(this);
-                  web.setBackgroundColor(0xFF101116);
-
-                  WebSettings settings = web.getSettings();
+                  webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
 
-                  web.loadUrl("file:///android_asset/index.html");
-                  setContentView(web);
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(
+                          WebView view,
+                          ValueCallback<Uri[]> callback,
+                          FileChooserParams params
+                      ) {
+                          if (fileCallback != null) {
+                              fileCallback.onReceiveValue(null);
+                          }
+                          fileCallback = callback;
+
+                          Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                          intent.setType("image/*");
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+                          startActivityForResult(
+                              Intent.createChooser(intent, "Pilih Skin"),
+                              FILE_REQUEST
+                          );
+                          return true;
+                      }
+                  });
+
+                  setContentView(webView);
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              @Override
+              protected void onActivityResult(
+                  int requestCode, int resultCode, Intent data
+              ) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (requestCode == FILE_REQUEST && fileCallback != null) {
+                      Uri[] result = null;
+                      if (resultCode == RESULT_OK && data != null
+                          && data.getData() != null) {
+                          result = new Uri[]{data.getData()};
+                      }
+                      fileCallback.onReceiveValue(result);
+                      fileCallback = null;
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
               }
           }
           EOF
@@ -142,87 +194,106 @@ jobs:
           <style>
           *{box-sizing:border-box}
           body{margin:0;background:#101116;color:white;font-family:Arial}
-          header{padding:18px;background:#1b1d25;display:flex;justify-content:space-between}
-          .logo{font-size:25px;font-weight:bold;color:#ff4949}
-          main{padding:18px;max-width:900px;margin:auto}
-          .profile,.panel,.menu{background:#20232d;border-radius:13px;padding:16px}
-          .profile{display:flex;align-items:center;gap:15px}
-          .skin{width:75px;height:75px;background:#a94c37;border:3px solid #ff5148;border-radius:10px;display:grid;place-items:center;font-size:30px}
-          button{background:#ff5048;color:white;border:0;padding:12px;border-radius:8px;font-weight:bold}
-          .orange{background:#e68a36}
-          .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
-          .menu{text-align:center;cursor:pointer}
-          .menu b{display:block;margin-top:8px}
-          .play{width:100%;background:#08090d;border:2px solid #ff4949;margin-top:18px;font-size:23px;padding:17px}
-          .panel{display:none;margin-top:15px}
-          .panel.active{display:block}
-          .item{background:#303440;padding:13px;margin:10px 0;border-radius:9px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-          .back{background:#454957;margin-bottom:12px}
-          label{display:block;margin:15px 0 7px}
-          input,select{width:100%;padding:9px;accent-color:#ff5148}
-          select{background:#303440;color:white;border-radius:8px}
-          .note{color:#aaa;font-size:12px}
-          .controller{height:230px;background:#15171e;position:relative;border-radius:12px;overflow:hidden;margin:12px 0}
+          header{height:65px;background:#1b1d25;display:flex;align-items:center;justify-content:space-between;padding:0 25px}
+          .logo{font-size:25px;font-weight:bold;color:#ff5148}
+          .tabs{display:flex;gap:25px}
+          .tab{background:transparent;color:white;font-size:16px}
+          .tab.active{color:#ff5148;border-bottom:2px solid #ff5148;border-radius:0}
+          main{max-width:900px;margin:auto;padding:20px}
+          .profile{background:#20232d;padding:16px;border-radius:12px;display:flex;align-items:center;gap:15px}
+          .skin{width:75px;height:75px;border:3px solid #ff5148;background:#a94c37;border-radius:9px;display:grid;place-items:center;font-size:30px;background-size:cover;background-position:center}
+          button{border:0;border-radius:8px;padding:11px 15px;background:#ff5148;color:white;font-weight:bold;cursor:pointer}
+          .orange{background:#e28a37}
+          .menu{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+          .menu button{width:100%;background:#20232d;border:1px solid #555b68;text-align:center;padding:15px;font-size:16px}
+          .menu button.selected{border-color:#ff5148;color:#ff5148}
+          .page{display:none}
+          .page.active{display:block}
+          .back{background:#444957;margin-bottom:15px}
+          .item{background:#20232d;padding:13px;border-radius:10px;margin:10px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
+          .item small{display:block;color:#aaa;margin-top:5px}
+          input,select{accent-color:#ff5148}
+          input[type=range]{width:100%}
+          select,input[type=search]{width:100%;padding:12px;background:#303440;color:white;border:1px solid #555;border-radius:8px}
+          label{display:block;margin:16px 0 7px}
+          .play{width:100%;margin-top:20px;padding:18px;background:#08090d;border:2px solid #ff5148;font-size:22px}
+          .muted{color:#aaa;font-size:12px;line-height:1.5}
+          .progressBox{display:none;background:#20232d;padding:20px;border-radius:12px;margin-top:15px}
+          .bar{height:12px;background:#454957;border-radius:20px;overflow:hidden;margin:8px 0}
+          .fill{height:100%;width:0;background:#35bd70;transition:width .2s}
+          .stage{margin:18px 0}
+          .stageLine{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+          .done{color:#35bd70}
+          .controller{height:230px;background:#171920;border-radius:12px;position:relative;overflow:hidden;margin:15px 0}
           .joy{position:absolute;left:25px;bottom:25px;width:90px;height:90px;border:3px solid #ff5148;border-radius:50%;display:grid;place-items:center}
           .stick{width:38px;height:38px;background:#ff5148;border-radius:50%}
-          .ctrl{position:absolute;width:48px;height:48px;border-radius:50%;background:#267bd0;display:grid;place-items:center;touch-action:none}
+          .ctrl{position:absolute;width:48px;height:48px;border-radius:50%;background:#287bd0;display:grid;place-items:center;touch-action:none}
           .jump{right:25px;bottom:25px}
-          .attack{right:85px;bottom:85px;background:#d34848}
+          .attack{right:85px;bottom:85px;background:#d34b45}
           .sneak{right:105px;bottom:20px;background:#777}
           </style>
           </head>
           <body>
-          <header><div class="logo">AUTHER</div><div>V0.1</div></header>
+          <header>
+            <div class="logo">AUTHER</div>
+            <div class="tabs">
+              <button class="tab active" id="downloadTab" onclick="showMain('download')">Unduh</button>
+              <button class="tab" id="settingsTab" onclick="showMain('settings')">Setting</button>
+            </div>
+          </header>
+
           <main>
-          <div id="home">
-            <div class="profile">
-              <div class="skin" id="skin">👤</div>
-              <div>
-                <b>PLAYER SKIN</b><br><br>
-                <button class="orange" onclick="document.getElementById('skinfile').click()">IMPORT SKIN</button>
-                <input hidden type="file" id="skinfile" accept="image/*" onchange="loadSkin(event)">
+          <section id="downloadMain" class="page active">
+            <div id="downloadHome">
+              <div class="profile">
+                <div class="skin" id="skin">👤</div>
+                <div>
+                  <b>PLAYER SKIN</b><br><br>
+                  <button class="orange" onclick="document.getElementById('skinFile').click()">IMPORT SKIN</button>
+                  <input id="skinFile" type="file" accept="image/*" hidden onchange="loadSkin(event)">
+                </div>
               </div>
+              <h3>Source All</h3>
+              <div class="menu">
+                <button onclick="openCatalog('Version')">Version</button>
+                <button onclick="openCatalog('Mods')">Mods</button>
+                <button onclick="openCatalog('Resource')">Resource</button>
+                <button onclick="openCatalog('Shader')">Shader</button>
+                <button onclick="openCatalog('Worlds')">World</button>
+              </div>
+              <button class="play" onclick="playGame()">▶ PLAY</button>
             </div>
-            <div class="grid">
-              <div class="menu" onclick="openPage('mods')">🧩<b>Mods</b></div>
-              <div class="menu" onclick="openPage('versions')">📦<b>Versi</b></div>
-              <div class="menu" onclick="openPage('resources')">🎨<b>Resource Pack</b></div>
-              <div class="menu" onclick="openPage('shaders')">✨<b>Shader</b></div>
-              <div class="menu" onclick="openPage('settings')">⚙️<b>Settings</b></div>
-              <div class="menu" onclick="openPage('controller')">🎮<b>Controller</b></div>
+
+            <div id="catalog" style="display:none">
+              <button class="back" onclick="backCatalog()">← KEMBALI</button>
+              <h2 id="catalogTitle">Version</h2>
+              <div id="versionOptions" style="display:none">
+                <input type="search" id="versionSearch" placeholder="Cari versi Minecraft..." oninput="filterVersions()">
+                <label>Pilih Loader</label>
+                <select id="loader">
+                  <option>Vanilla</option><option>Fabric</option>
+                  <option>Forge</option><option>NeoForge</option><option>Quilt</option>
+                </select>
+              </div>
+              <div id="catalogItems"></div>
             </div>
-            <button class="play" onclick="alert('Minecraft Java belum terhubung ke runtime launcher.')">▶ PLAY</button>
-          </div>
 
-          <div id="mods" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
-            <h2>Mods</h2><div id="modlist"></div>
-          </div>
-          <div id="versions" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
-            <h2>Versi Minecraft</h2><div id="versionlist"></div>
-          </div>
-          <div id="resources" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
-            <h2>Resource Pack</h2><div id="resourcelist"></div>
-          </div>
-          <div id="shaders" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
-            <h2>Shader</h2><div id="shaderlist"></div>
-          </div>
+            <div id="installProgress" class="progressBox">
+              <h3 id="progressTitle">Tunggu Pemasangan</h3>
+              <div id="stages"></div>
+              <p id="progressMessage" class="muted">Pemasangan sedang disiapkan...</p>
+              <button id="finishButton" style="display:none" onclick="finishInstall()">Selesai</button>
+            </div>
+          </section>
 
-          <div id="settings" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
+          <section id="settingsMain" class="page">
             <h2>Settings</h2>
             <label>Graphics Renderer</label>
             <select><option>MobileGlues</option></select>
             <label>Java Runtime</label>
-            <select>
-              <option>Java 8</option><option>Java 17</option>
-              <option>Java 21</option><option>Java 25</option>
-            </select>
+            <select><option>Java 8</option><option>Java 17</option><option>Java 21</option><option>Java 25</option></select>
             <label>RAM Allocation</label>
-            <input type="range" min="512" max="8192" value="2048">
+            <input type="range" min="512" max="8192" step="256" value="2048">
             <h3>Mouse Settings</h3>
             <label>Ukuran Mouse</label>
             <input type="range" min="10" max="100" value="40">
@@ -230,13 +301,8 @@ jobs:
             <input type="range" min="1" max="100" value="50">
             <label>Sensitivitas</label>
             <input type="range" min="1" max="100" value="50">
-          </div>
-
-          <div id="controller" class="panel">
-            <button class="back" onclick="home()">← KEMBALI</button>
-            <h2>Custom Controller</h2>
-            <p class="note">Geser tombol untuk mengubah posisinya.</p>
-            <div class="controller" id="area">
+            <h3>Custom Controller</h3>
+            <div class="controller" id="controllerArea">
               <div class="joy"><div class="stick"></div></div>
               <div class="ctrl jump movable">J</div>
               <div class="ctrl attack movable">A</div>
@@ -246,44 +312,122 @@ jobs:
             <input type="range" min="25" max="90" value="48" oninput="resizeButtons(this.value)">
             <label>Transparansi</label>
             <input type="range" min="20" max="100" value="100" oninput="opacityButtons(this.value)">
-            <button onclick="alert('Layout controller tersimpan sementara.')">SIMPAN LAYOUT</button>
-          </div>
+            <button onclick="alert('Pengaturan controller disimpan selama sesi ini.')">SIMPAN LAYOUT</button>
+          </section>
           </main>
 
           <script>
-          const catalogs={
-            modlist:['Sodium','Lithium','FerriteCore','Mod Menu'],
-            versionlist:['1.21.11','1.21.10','1.21.8','1.20.1'],
-            resourcelist:['Faithful','Bare Bones','Classic 3D'],
-            shaderlist:['Complementary','BSL Shader','Sildur']
+          const data={
+            Version:['1.21.11','1.21.10','1.21.8','1.21','1.20.1','1.19.4'],
+            Mods:['Sodium','Lithium','FerriteCore','Mod Menu'],
+            Resource:['Faithful','Bare Bones','Classic 3D'],
+            Shader:['Complementary','BSL Shader','Sildur'],
+            Worlds:['Survival World','Creative World','Skyblock World']
           };
-          for(const id in catalogs){
-            document.getElementById(id).innerHTML=catalogs[id].map(n=>
-              `<div class="item"><span>${n}</span><button onclick="install(this)">INSTAL</button></div>`
+          let currentCategory='';
+          let selectedItem='';
+
+          function showMain(name){
+            document.getElementById('downloadMain').classList.toggle('active',name==='download');
+            document.getElementById('settingsMain').classList.toggle('active',name==='settings');
+            document.getElementById('downloadTab').classList.toggle('active',name==='download');
+            document.getElementById('settingsTab').classList.toggle('active',name==='settings');
+            if(name==='download')backCatalog();
+          }
+
+          function openCatalog(category){
+            currentCategory=category;
+            document.getElementById('downloadHome').style.display='none';
+            document.getElementById('catalog').style.display='block';
+            document.getElementById('installProgress').style.display='none';
+            document.getElementById('catalogTitle').textContent=category;
+            document.getElementById('versionOptions').style.display=category==='Version'?'block':'none';
+            renderItems(data[category]);
+          }
+
+          function renderItems(items){
+            document.getElementById('catalogItems').innerHTML=items.map(name=>
+              `<div class="item"><div><b>${name}</b><small>${currentCategory}</small></div><button onclick="startInstall('${name.replace(/'/g,"\\'")}')">INSTAL</button></div>`
             ).join('');
           }
-          function install(btn){
-            btn.textContent='TERINSTAL';
-            btn.style.background='#287b4c';
-            btn.disabled=true;
-            alert('Simulasi instalasi. File Minecraft belum benar-benar dipasang.');
+
+          function filterVersions(){
+            const q=document.getElementById('versionSearch').value.toLowerCase();
+            renderItems(data.Version.filter(v=>v.toLowerCase().includes(q)));
           }
-          function openPage(id){
-            document.getElementById('home').style.display='none';
-            document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+
+          function backCatalog(){
+            document.getElementById('catalog').style.display='none';
+            document.getElementById('installProgress').style.display='none';
+            document.getElementById('downloadHome').style.display='block';
           }
-          function home(){
-            document.getElementById('home').style.display='block';
-            document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+
+          function startInstall(name){
+            selectedItem=name;
+            document.getElementById('catalog').style.display='none';
+            const box=document.getElementById('installProgress');
+            box.style.display='block';
+            document.getElementById('progressTitle').textContent=
+              currentCategory==='Version'?'Tunggu Pemasangan Versi':'Tunggu Pemasangan';
+            document.getElementById('finishButton').style.display='none';
+
+            const stages=currentCategory==='Version'
+              ?['Cache game','Version '+name,'Loader '+name+' - '+document.getElementById('loader').value,'Menyiapkan semua']
+              :['Mengunduh '+name,'Memeriksa file','Menyiapkan pemasangan','Memasang '+name];
+
+            document.getElementById('stages').innerHTML=stages.map((s,i)=>
+              `<div class="stage"><div class="stageLine"><b>${s}</b><span id="pct${i}">0%</span></div><div class="bar"><div class="fill" id="fill${i}"></div></div></div>`
+            ).join('');
+
+            document.getElementById('progressMessage').textContent=
+              'Catatan: ini prototipe antarmuka. Pemasangan file game belum terhubung.';
+
+            stages.forEach((s,i)=>{
+              let p=0;
+              const timer=setInterval(()=>{
+                p+=5;
+                document.getElementById('fill'+i).style.width=p+'%';
+                document.getElementById('pct'+i).textContent=p+'%';
+                if(p>=100){
+                  clearInterval(timer);
+                  if(i===stages.length-1){
+                    document.getElementById('progressMessage').textContent=
+                      'Simulasi selesai. File game belum benar-benar dipasang.';
+                    document.getElementById('finishButton').style.display='block';
+                  }
+                }
+              },80*(i+1));
+            });
           }
-          function loadSkin(e){
-            if(e.target.files[0]){
-              document.getElementById('skin').innerHTML='';
-              document.getElementById('skin').style.backgroundImage='url('+URL.createObjectURL(e.target.files[0])+')';
-              document.getElementById('skin').style.backgroundSize='cover';
-            }
+
+          function finishInstall(){
+            document.getElementById('progressTitle').textContent=
+              currentCategory==='Version'?'Version belum benar-benar terinstal':'Simulasi pemasangan selesai';
+            document.getElementById('progressMessage').textContent=
+              'Pemasangan nyata membutuhkan integrasi pengunduh dan penyimpan file Android.';
+            document.getElementById('finishButton').style.display='none';
+            const b=document.createElement('button');
+            b.textContent='Kembali';
+            b.onclick=backCatalog;
+            document.getElementById('stages').appendChild(b);
           }
+
+          function loadSkin(event){
+            const file=event.target.files[0];
+            if(!file)return;
+            const reader=new FileReader();
+            reader.onload=e=>{
+              const skin=document.getElementById('skin');
+              skin.textContent='';
+              skin.style.backgroundImage='url('+e.target.result+')';
+            };
+            reader.readAsDataURL(file);
+          }
+
+          function playGame(){
+            alert('Minecraft Java belum dapat dijalankan. Runtime Java, library, aset, loader, dan renderer perlu diintegrasikan terlebih dahulu.');
+          }
+
           function resizeButtons(v){
             document.querySelectorAll('.ctrl').forEach(b=>{
               b.style.width=v+'px';b.style.height=v+'px';
@@ -292,22 +436,23 @@ jobs:
           function opacityButtons(v){
             document.querySelectorAll('.ctrl,.joy').forEach(b=>b.style.opacity=v/100);
           }
+
           document.querySelectorAll('.movable').forEach(el=>{
             let drag=false,dx=0,dy=0;
-            el.onpointerdown=e=>{
+            el.addEventListener('pointerdown',e=>{
               drag=true;
               const r=el.getBoundingClientRect();
               dx=e.clientX-r.left;dy=e.clientY-r.top;
               el.setPointerCapture(e.pointerId);
-            };
-            el.onpointermove=e=>{
+            });
+            el.addEventListener('pointermove',e=>{
               if(!drag)return;
-              const r=document.getElementById('area').getBoundingClientRect();
+              const r=document.getElementById('controllerArea').getBoundingClientRect();
               el.style.left=(e.clientX-r.left-dx)+'px';
               el.style.top=(e.clientY-r.top-dy)+'px';
               el.style.right='auto';el.style.bottom='auto';
-            };
-            el.onpointerup=()=>drag=false;
+            });
+            el.addEventListener('pointerup',()=>drag=false);
           });
           </script>
           </body>
@@ -315,10 +460,9 @@ jobs:
           EOF
 
       - name: Build APK
-        run: |
-          gradle assembleDebug
+        run: gradle assembleDebug
 
-      - name: Upload AUTHER APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-LAUNCHER-V0.1
