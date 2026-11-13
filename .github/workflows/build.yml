@@ -15,22 +15,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Ambil project
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Java
-      - name: Setup JDK 17
+      - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      # 3. Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup SDK Environment
+      - name: Prepare SDK
         shell: bash
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
@@ -38,16 +35,18 @@ jobs:
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
-      # 4. Terima lisensi SDK
-      - name: Accept Android SDK Licenses
+      - name: Accept SDK Licenses
         shell: bash
         run: |
-          set +o pipefail
+          set +e
           yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
-          set -o pipefail
+          RESULT=${PIPESTATUS[1]}
+          if [ "$RESULT" -ne 0 ]; then
+            echo "SDK license acceptance failed"
+            exit "$RESULT"
+          fi
 
-      # 5. Instal SDK
-      - name: Install Android SDK Packages
+      - name: Install SDK Packages
         shell: bash
         run: |
           sdkmanager --sdk_root="$ANDROID_HOME" \
@@ -55,49 +54,30 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      # 6. Periksa SDK
-      - name: Verify Android SDK
+      - name: Verify SDK
         shell: bash
         run: |
           test -d "$ANDROID_HOME/platforms/android-35"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           adb version
-          echo "Android SDK berhasil disiapkan"
+          echo "SDK READY"
 
-      # 7. Periksa project
-      - name: Check Android Project
+      - name: Check Gradle Project
         shell: bash
         run: |
           test -f gradlew
           test -f settings.gradle || test -f settings.gradle.kts
           test -f app/build.gradle || test -f app/build.gradle.kts
 
-      # 8. Persiapan Gradle
-      - name: Grant Gradle Permission
+      - name: Setup Gradle Permission
         run: chmod +x gradlew
 
-      # 9. Build APK Debug
-      - name: Build Debug APK
+      - name: Build AUTHER Launcher APK
         run: ./gradlew assembleDebug --stacktrace
 
-      # 10. Build APK Release
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
-        continue-on-error: true
-
-      # 11. Upload APK Debug
-      - name: Upload Debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-V0.1-Debug
+          name: AUTHER-Launcher-V0.1
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-
-      # 12. Upload APK Release
-      - name: Upload Release APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: AUTHER-Launcher-V0.1-Release
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: ignore
