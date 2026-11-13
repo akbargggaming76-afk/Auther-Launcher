@@ -20,36 +20,43 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install SDK
+      - name: Install Android SDK
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
 
-      - name: Check project
+      - name: Check Android Project
         run: |
           if [ ! -f gradlew ]; then
-            echo "ERROR: gradlew tidak ditemukan."
-            exit 1
-          fi
-          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
-            echo "ERROR: Modul Android app tidak ditemukan."
+            echo "ERROR: File gradlew tidak ditemukan."
             exit 1
           fi
 
-      - name: Build AUTHER APK
+          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
+            echo "ERROR: File settings.gradle tidak ditemukan."
+            exit 1
+          fi
+
+          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
+            echo "ERROR: File app/build.gradle tidak ditemukan."
+            exit 1
+          fi
+
+      - name: Build APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload AUTHER APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-Launcher-V0.1
