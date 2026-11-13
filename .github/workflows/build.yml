@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -28,35 +27,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
+      - name: Install Android SDK Components
         run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Check Android Project
+      - name: Check Project
         run: |
-          if [ ! -f gradlew ]; then
-            echo "ERROR: File gradlew tidak ditemukan."
-            exit 1
-          fi
-
-          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
-            echo "ERROR: File settings.gradle tidak ditemukan."
-            exit 1
-          fi
-
-          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
-            echo "ERROR: File app/build.gradle tidak ditemukan."
-            exit 1
-          fi
+          test -f gradlew || (echo "gradlew tidak ditemukan" && exit 1)
+          test -f settings.gradle -o -f settings.gradle.kts || (echo "settings.gradle tidak ditemukan" && exit 1)
+          test -f app/build.gradle -o -f app/build.gradle.kts || (echo "app/build.gradle tidak ditemukan" && exit 1)
 
       - name: Build APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload AUTHER APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-Launcher-V0.1
