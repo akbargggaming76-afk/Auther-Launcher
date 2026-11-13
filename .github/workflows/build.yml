@@ -15,25 +15,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Ambil project
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup JDK
+      # 2. Java
+      - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android Licenses
+      - name: Setup SDK Environment
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+      # 4. Terima lisensi SDK
+      - name: Accept Android SDK Licenses
         shell: bash
         run: |
           set +o pipefail
-          yes | sdkmanager --licenses
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
           set -o pipefail
 
+      # 5. Instal SDK
       - name: Install Android SDK Packages
         shell: bash
         run: |
@@ -42,42 +55,37 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Verify SDK
+      # 6. Periksa SDK
+      - name: Verify Android SDK
+        shell: bash
         run: |
-          echo "Java:"
-          java -version
-          echo "Android SDK:"
-          sdkmanager --version
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
           adb version
+          echo "Android SDK berhasil disiapkan"
 
+      # 7. Periksa project
       - name: Check Android Project
         shell: bash
         run: |
-          if [ ! -f gradlew ]; then
-            echo "ERROR: gradlew tidak ditemukan"
-            exit 1
-          fi
+          test -f gradlew
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
 
-          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
-            echo "ERROR: settings.gradle tidak ditemukan"
-            exit 1
-          fi
-
-          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
-            echo "ERROR: app/build.gradle tidak ditemukan"
-            exit 1
-          fi
-
+      # 8. Persiapan Gradle
       - name: Grant Gradle Permission
         run: chmod +x gradlew
 
+      # 9. Build APK Debug
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      # 10. Build APK Release
       - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
         continue-on-error: true
 
+      # 11. Upload APK Debug
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -85,6 +93,7 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      # 12. Upload APK Release
       - name: Upload Release APK
         if: success()
         uses: actions/upload-artifact@v4
