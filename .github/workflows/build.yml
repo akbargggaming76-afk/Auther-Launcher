@@ -1,5 +1,5 @@
 
-name: AUTHER Launcher Build
+name: AUTHER Launcher V0.1 APK Build
 
 on:
   workflow_dispatch:
@@ -12,40 +12,98 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build AUTHER Launcher
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout
+      - name: Download Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Install Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK Packages
+      - name: Prepare Android SDK Directory
+        shell: bash
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          mkdir -p "$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
 
-      - name: Accept Android Licenses
+      - name: Install Android Command Line Tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/android-tools.zip
+          mkdir -p /tmp/android-tools
+          unzip -q /tmp/android-tools.zip -d /tmp/android-tools
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          mv /tmp/android-tools/cmdline-tools/* "$ANDROID_HOME/cmdline-tools/latest/"
+
+      - name: Configure Android SDK Manager
+        shell: bash
+        run: |
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          chmod +x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          sdkmanager --version
+
+      - name: Accept Android SDK Licenses
+        shell: bash
         run: |
           yes | sdkmanager --licenses
+
+      - name: Install Android SDK Packages
+        shell: bash
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          sdkmanager --list_installed
+          echo "Android SDK berhasil disiapkan."
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
-        run: gradle --no-daemon assembleDebug
+      - name: Check Project Files
+        shell: bash
+        run: |
+          echo "Memeriksa file proyek..."
+          ls -la
+          test -f settings.gradle
+          test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
 
-      - name: Upload APK
+      - name: Build AUTHER Launcher APK
+        shell: bash
+        run: |
+          gradle --no-daemon clean assembleDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload AUTHER Launcher APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-LAUNCHER-V0.1
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 7
