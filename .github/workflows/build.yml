@@ -7,16 +7,19 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    name: Build AUTHER Launcher V0.1
+    name: Build AUTHER Launcher V0.1 APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -25,13 +28,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Generate Android Project
+      - name: Install Android SDK packages
         run: |
-          mkdir -p app/src/main/assets
+          yes | sdkmanager --licenses
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Create Android project
+        shell: bash
+        run: |
           mkdir -p app/src/main/java/com/auther/launcher
+          mkdir -p app/src/main/assets
 
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -41,6 +52,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -48,8 +60,9 @@ jobs:
                   mavenCentral()
               }
           }
+
           rootProject.name = "AUTHERLauncher"
-          include ':app'
+          include(":app")
           EOF
 
           cat > build.gradle <<'EOF'
@@ -58,7 +71,10 @@ jobs:
           }
           EOF
 
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
 
           cat > app/build.gradle <<'EOF'
           plugins {
@@ -82,16 +98,20 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
-                  android:theme="@android:style/Theme.Material.NoActionBar"
+                  android:allowBackup="true"
                   android:label="AUTHER Launcher"
+                  android:theme="@android:style/Theme.Material.NoActionBar"
                   android:usesCleartextTraffic="true">
+
                   <activity
                       android:name=".MainActivity"
                       android:screenOrientation="landscape"
+                      android:configChanges="orientation|screenSize|keyboardHidden"
                       android:exported="true">
+
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
               </application>
@@ -102,20 +122,89 @@ jobs:
           package com.auther.launcher;
 
           import android.app.Activity;
+          import android.content.Intent;
+          import android.net.Uri;
           import android.os.Bundle;
-          import android.webkit.WebView;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
 
           public class MainActivity extends Activity {
+              private WebView webView;
+              private ValueCallback<Uri[]> fileCallback;
+              private static final int FILE_REQUEST = 1001;
+
               @Override
-              public void onCreate(Bundle savedInstanceState) {
+              protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  WebView web = new WebView(this);
-                  WebSettings settings = web.getSettings();
+
+                  webView = new WebView(this);
+                  WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
-                  setContentView(web);
-                  web.loadUrl("file:///android_asset/index.html");
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+
+                  webView.setWebViewClient(new WebViewClient());
+
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(
+                              WebView view,
+                              ValueCallback<Uri[]> callback,
+                              FileChooserParams params) {
+
+                          if (fileCallback != null) {
+                              fileCallback.onReceiveValue(null);
+                          }
+
+                          fileCallback = callback;
+
+                          Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+                          intent.setType("image/*");
+
+                          startActivityForResult(
+                              Intent.createChooser(intent, "Pilih wallpaper"),
+                              FILE_REQUEST
+                          );
+                          return true;
+                      }
+                  });
+
+                  setContentView(webView);
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              @Override
+              protected void onActivityResult(
+                      int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+
+                  if (requestCode == FILE_REQUEST && fileCallback != null) {
+                      Uri[] results = null;
+
+                      if (resultCode == Activity.RESULT_OK && data != null) {
+                          Uri uri = data.getData();
+                          if (uri != null) {
+                              results = new Uri[]{uri};
+                          }
+                      }
+
+                      fileCallback.onReceiveValue(results);
+                      fileCallback = null;
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
               }
           }
           EOF
@@ -125,104 +214,161 @@ jobs:
           <html lang="id">
           <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>AUTHER Launcher</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>AUTHER Launcher V0.1</title>
           <style>
           *{box-sizing:border-box}
-          body{margin:0;background:#100b10;color:white;font-family:Arial}
-          header{height:60px;background:#171117;display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:2px solid #bd2935}
-          .logo{font-size:24px;font-weight:900;color:#ff424b;letter-spacing:3px}
-          button{background:#a92130;color:white;border:0;border-radius:8px;padding:12px 18px;font-weight:bold}
-          nav{display:flex;gap:8px}
-          main{min-height:calc(100vh - 60px);padding:20px;background:linear-gradient(#0005,#0009),radial-gradient(ellipse at 50% 100%,#842b36,#24121c 65%,#100b10)}
-          .panel{max-width:650px;margin:30px auto;text-align:center;background:#100b10c9;border:1px solid #b52c39;border-radius:15px;padding:25px}
-          h1{font-size:45px;color:#ff414b;margin:10px}
-          h2{letter-spacing:5px}
-          .play{width:100%;font-size:23px;padding:18px;margin-top:20px}
-          .version{margin-top:15px;font-weight:bold}
-          .section{max-width:650px;margin:25px auto;background:#19131a;padding:20px;border-radius:12px}
-          .item{display:flex;justify-content:space-between;padding:14px;border-bottom:1px solid #49313a}
-          select,input{padding:10px;background:#29202a;color:white;border:1px solid #a52b39;border-radius:7px}
+          body{margin:0;background:#100d12;color:white;font-family:Arial,sans-serif}
+          header{height:60px;background:#17131a;border-bottom:2px solid #bd2935;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
+          .logo{font-size:23px;font-weight:900;color:#ff424b;letter-spacing:3px}
+          nav{display:flex;gap:7px}
+          button{background:#30232a;color:white;border:1px solid #77303a;border-radius:8px;padding:11px 15px;font-weight:bold}
+          button:active{background:#bd2935}
+          main{min-height:calc(100vh - 60px);padding:18px;background:linear-gradient(#160d16aa,#100810dd),radial-gradient(ellipse at 50% 80%,#9b2839,#28121f 65%,#100d12);background-size:cover;background-position:center}
+          .panel{max-width:650px;margin:30px auto;text-align:center;background:#100d12d9;border:1px solid #a52d38;border-radius:16px;padding:25px}
+          h1{font-size:45px;color:#ff424b;margin:8px;text-shadow:0 3px 12px black}
+          h2{letter-spacing:4px}
+          .play{display:block;width:100%;font-size:23px;background:#bd2935;border:0;margin-top:25px;padding:17px}
+          .version{margin-top:14px;font-weight:bold;color:#fff}
+          .section{max-width:650px;margin:20px auto;background:#17131aee;border:1px solid #65303a;padding:20px;border-radius:12px}
+          .item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #453039;gap:10px}
+          select,input{background:#29232b;color:white;border:1px solid #87404a;padding:10px;border-radius:7px;max-width:100%}
           .hidden{display:none}
+          .hint{color:#cbbfc3;font-size:13px}
           </style>
           </head>
           <body>
           <header>
-          <div class="logo">AUTHER</div>
-          <nav>
-          <button onclick="page('home')">HOME</button>
-          <button onclick="page('download')">UNDUH</button>
-          <button onclick="page('settings')">SETTING</button>
-          </nav>
+            <div class="logo">AUTHER</div>
+            <nav>
+              <button onclick="showPage('home')">HOME</button>
+              <button onclick="showPage('download')">UNDUH</button>
+              <button onclick="showPage('settings')">SETTING</button>
+            </nav>
           </header>
-          <main>
-          <section id="home">
-          <div class="panel">
-          <h1>AUTHER</h1>
-          <h2>LAUNCHER</h2>
-          <p>Minecraft Java Edition</p>
-          <button class="play" onclick="play()">▶ PLAY</button>
-          <div class="version" id="versionText">Minecraft 1.21 | Fabric 0.19.5</div>
-          </div>
-          </section>
-          <section id="download" class="hidden">
-          <div class="section">
-          <h2>UNDUH</h2>
-          <div id="categories"></div>
-          </div>
-          <div class="section hidden" id="versionPanel">
-          <h3>Versi Minecraft</h3>
-          <select id="mc"><option>1.21</option><option>1.20.6</option><option>1.20.4</option><option>1.19.4</option></select>
-          <h3>Loader</h3>
-          <select id="loader"><option>Vanilla</option><option>Fabric 0.19.5</option><option>Forge</option><option>NeoForge</option><option>Quilt</option></select>
-          <br><br>
-          <button onclick="installVersion()">INSTAL</button>
-          </div>
-          </section>
-          <section id="settings" class="hidden">
-          <div class="section">
-          <h2>SETTING</h2>
-          <p>Ganti Background</p>
-          <input type="file" accept="image/*" onchange="wallpaper(event)">
-          <p>Renderer</p>
-          <select><option>MobileGlues</option></select>
-          <p>Java Runtime</p>
-          <select><option>Java 8</option><option>Java 17</option><option>Java 21</option><option>Java 25</option></select>
-          <p>RAM</p>
-          <select><option>1024 MB</option><option>2048 MB</option><option>4096 MB</option></select>
-          </div>
-          </section>
+
+          <main id="background">
+            <section id="home">
+              <div class="panel">
+                <h1>AUTHER</h1>
+                <h2>LAUNCHER</h2>
+                <p>Minecraft Java Edition</p>
+                <button class="play" onclick="playGame()">▶ PLAY</button>
+                <div class="version" id="selectedVersion">Minecraft 1.21 | Fabric 0.19.5</div>
+              </div>
+            </section>
+
+            <section id="download" class="hidden">
+              <div class="section">
+                <h2>UNDUH</h2>
+                <div id="categories"></div>
+              </div>
+
+              <div class="section hidden" id="versionPanel">
+                <h3>Pilih Minecraft Version</h3>
+                <select id="mcVersion">
+                  <option>1.21</option>
+                  <option>1.20.6</option>
+                  <option>1.20.4</option>
+                  <option>1.19.4</option>
+                </select>
+
+                <h3>Pilih Loader</h3>
+                <select id="loader">
+                  <option>Vanilla</option>
+                  <option>Fabric 0.19.5</option>
+                  <option>Forge</option>
+                  <option>NeoForge</option>
+                  <option>Quilt</option>
+                </select>
+                <p><button onclick="installVersion()">SIMPAN PILIHAN</button></p>
+                <p class="hint">Pilihan versi disimpan sebagai tampilan. Instalasi game belum tersedia.</p>
+              </div>
+            </section>
+
+            <section id="settings" class="hidden">
+              <div class="section">
+                <h2>SETTING</h2>
+                <h3>Ganti Background</h3>
+                <input type="file" accept="image/*" onchange="changeBackground(event)">
+                <p class="hint">Pilih gambar dari galeri HP.</p>
+
+                <h3>Renderer</h3>
+                <select><option>MobileGlues</option></select>
+
+                <h3>Java Runtime</h3>
+                <select>
+                  <option>Java 8</option>
+                  <option>Java 17</option>
+                  <option>Java 21</option>
+                  <option>Java 25</option>
+                </select>
+
+                <h3>RAM</h3>
+                <select>
+                  <option>1024 MB</option>
+                  <option>2048 MB</option>
+                  <option>4096 MB</option>
+                </select>
+              </div>
+            </section>
           </main>
+
           <script>
-          function page(id){
-          ['home','download','settings'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));
+          function showPage(page){
+            ['home','download','settings'].forEach(id=>{
+              document.getElementById(id).classList.toggle('hidden',id!==page);
+            });
           }
-          ['Source All','Version','Mods','Resource','Shader','Worlds'].forEach(name=>{
-          let div=document.createElement('div');
-          div.className='item';
-          let label=document.createElement('span');
-          label.textContent=name;
-          let btn=document.createElement('button');
-          btn.textContent='BUKA';
-          btn.onclick=()=>{
-          document.getElementById('versionPanel').classList.toggle('hidden',name!=='Version');
-          if(name!=='Version') alert('Katalog '+name+' belum terhubung.');
-          };
-          div.append(label,btn);
-          document.getElementById('categories').append(div);
+
+          const categories=['Source All','Version','Mods','Resource','Shader','Worlds'];
+          const container=document.getElementById('categories');
+
+          categories.forEach(name=>{
+            const row=document.createElement('div');
+            row.className='item';
+
+            const label=document.createElement('span');
+            label.textContent=name;
+
+            const button=document.createElement('button');
+            button.textContent='BUKA';
+            button.onclick=()=>{
+              document.getElementById('versionPanel').classList.toggle('hidden',name!=='Version');
+              if(name!=='Version'){
+                alert('Katalog '+name+' belum terhubung ke layanan unduhan.');
+              }
+            };
+
+            row.append(label,button);
+            container.appendChild(row);
           });
+
           function installVersion(){
-          document.getElementById('versionText').textContent='Minecraft '+document.getElementById('mc').value+' | '+document.getElementById('loader').value;
-          alert('Pilihan versi disimpan. Instalasi game belum terhubung.');
-          page('home');
+            const version=document.getElementById('mcVersion').value;
+            const loader=document.getElementById('loader').value;
+            document.getElementById('selectedVersion').textContent=
+              'Minecraft '+version+' | '+loader;
+            alert('Pilihan versi disimpan. Game belum diinstal.');
+            showPage('home');
           }
-          function wallpaper(e){
-          if(!e.target.files[0])return;
-          let url=URL.createObjectURL(e.target.files[0]);
-          document.querySelector('main').style.background='linear-gradient(#0005,#0009),url('+url+') center/cover';
+
+          function changeBackground(event){
+            const file=event.target.files && event.target.files[0];
+            if(!file)return;
+
+            const reader=new FileReader();
+            reader.onload=function(){
+              document.getElementById('background').style.backgroundImage=
+                'linear-gradient(#160d1666,#100810aa),url("'+reader.result+'")';
+              document.getElementById('background').style.backgroundSize='cover';
+              document.getElementById('background').style.backgroundPosition='center';
+            };
+            reader.readAsDataURL(file);
           }
-          function play(){
-          alert('Engine Minecraft Java belum terintegrasi. PLAY belum dapat menjalankan game.');
+
+          function playGame(){
+            alert('Minecraft Java belum bisa dijalankan. Engine launcher, runtime Java, library, assets, loader dan renderer belum terintegrasi.');
           }
           </script>
           </body>
@@ -230,11 +376,11 @@ jobs:
           EOF
 
       - name: Build APK
-        run: |
-          gradle assembleDebug
+        run: gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-LAUNCHER-V0.1
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
