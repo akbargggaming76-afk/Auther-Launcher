@@ -27,14 +27,15 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-35
-            build-tools;35.0.0
-            platform-tools
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses
+      - name: Install Android SDK
+        run: |
+          sdkmanager --update
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Accept Android Licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -315,19 +316,14 @@ jobs:
           categories.forEach(name=>{
             const row=document.createElement('div');
             row.className='item';
-
             const label=document.createElement('span');
             label.textContent=name;
-
             const button=document.createElement('button');
             button.textContent='BUKA';
             button.onclick=()=>{
               document.getElementById('versionPanel').classList.toggle('hidden',name!=='Version');
-              if(name!=='Version'){
-                alert('Katalog '+name+' belum terhubung.');
-              }
+              if(name!=='Version') alert('Katalog '+name+' belum terhubung.');
             };
-
             row.append(label,button);
             container.appendChild(row);
           });
