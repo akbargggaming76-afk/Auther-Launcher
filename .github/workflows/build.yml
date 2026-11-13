@@ -1,5 +1,5 @@
 
-name: AUTHER Launcher V0.1 Build
+name: AUTHER Launcher Build
 
 on:
   workflow_dispatch:
@@ -12,14 +12,13 @@ permissions:
 
 jobs:
   build:
-    name: Build AUTHER Launcher V0.1 APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -28,338 +27,22 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
+      - name: Install Android SDK Packages
         run: |
-          sdkmanager --update
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Accept Android Licenses
         run: |
-          yes | sdkmanager --licenses || true
+          yes | sdkmanager --licenses
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Create Android Project
-        shell: bash
+      - name: Build AUTHER Launcher APK
         run: |
-          mkdir -p app/src/main/java/com/auther/launcher
-          mkdir -p app/src/main/assets
-
-          cat > settings.gradle <<'EOF'
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          rootProject.name = "AUTHERLauncher"
-          include(":app")
-          EOF
-
-          cat > build.gradle <<'EOF'
-          plugins {
-              id 'com.android.application' version '8.7.3' apply false
-          }
-          EOF
-
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          EOF
-
-          cat > app/build.gradle <<'EOF'
-          plugins {
-              id 'com.android.application'
-          }
-
-          android {
-              namespace 'com.auther.launcher'
-              compileSdk 35
-
-              defaultConfig {
-                  applicationId 'com.auther.launcher'
-                  minSdk 23
-                  targetSdk 28
-                  versionCode 1
-                  versionName '0.1'
-              }
-          }
-          EOF
-
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application
-                  android:allowBackup="true"
-                  android:label="AUTHER Launcher"
-                  android:theme="@android:style/Theme.Material.NoActionBar"
-                  android:usesCleartextTraffic="true">
-
-                  <activity
-                      android:name=".MainActivity"
-                      android:screenOrientation="landscape"
-                      android:configChanges="orientation|screenSize|keyboardHidden"
-                      android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-          cat > app/src/main/java/com/auther/launcher/MainActivity.java <<'EOF'
-          package com.auther.launcher;
-
-          import android.app.Activity;
-          import android.content.Intent;
-          import android.net.Uri;
-          import android.os.Bundle;
-          import android.webkit.WebChromeClient;
-          import android.webkit.WebSettings;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
-          import android.webkit.ValueCallback;
-
-          public class MainActivity extends Activity {
-              private WebView webView;
-              private ValueCallback<Uri[]> fileCallback;
-
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-
-                  webView = new WebView(this);
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setAllowFileAccess(true);
-                  settings.setAllowContentAccess(true);
-
-                  webView.setWebViewClient(new WebViewClient());
-
-                  webView.setWebChromeClient(new WebChromeClient() {
-                      @Override
-                      public boolean onShowFileChooser(
-                              WebView view,
-                              ValueCallback<Uri[]> callback,
-                              FileChooserParams params) {
-                          if (fileCallback != null) {
-                              fileCallback.onReceiveValue(null);
-                          }
-
-                          fileCallback = callback;
-
-                          Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                          intent.addCategory(Intent.CATEGORY_OPENABLE);
-                          intent.setType("image/*");
-
-                          startActivityForResult(
-                              Intent.createChooser(intent, "Pilih wallpaper"),
-                              1001
-                          );
-                          return true;
-                      }
-                  });
-
-                  setContentView(webView);
-                  webView.loadUrl("file:///android_asset/index.html");
-              }
-
-              @Override
-              protected void onActivityResult(
-                      int requestCode, int resultCode, Intent data) {
-                  super.onActivityResult(requestCode, resultCode, data);
-
-                  if (requestCode == 1001 && fileCallback != null) {
-                      Uri[] result = null;
-                      if (resultCode == RESULT_OK && data != null
-                              && data.getData() != null) {
-                          result = new Uri[]{data.getData()};
-                      }
-                      fileCallback.onReceiveValue(result);
-                      fileCallback = null;
-                  }
-              }
-
-              @Override
-              public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
-              }
-          }
-          EOF
-
-          cat > app/src/main/assets/index.html <<'EOF'
-          <!DOCTYPE html>
-          <html lang="id">
-          <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>AUTHER Launcher V0.1</title>
-          <style>
-          *{box-sizing:border-box}
-          body{margin:0;background:#100d12;color:white;font-family:Arial}
-          header{height:60px;background:#17131a;border-bottom:2px solid #bd2935;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
-          .logo{font-size:23px;font-weight:900;color:#ff424b;letter-spacing:3px}
-          nav{display:flex;gap:7px}
-          button{background:#30232a;color:white;border:1px solid #77303a;border-radius:8px;padding:11px 15px;font-weight:bold}
-          button:active{background:#bd2935}
-          main{min-height:calc(100vh - 60px);padding:18px;background:linear-gradient(#160d1666,#100810bb),radial-gradient(ellipse at 50% 80%,#9b2839,#28121f 65%,#100d12);background-size:cover;background-position:center}
-          .panel{max-width:650px;margin:30px auto;text-align:center;background:#100d12d9;border:1px solid #a52d38;border-radius:16px;padding:25px}
-          h1{font-size:45px;color:#ff424b;margin:8px;text-shadow:0 3px 12px black}
-          h2{letter-spacing:4px}
-          .play{display:block;width:100%;font-size:23px;background:#bd2935;border:0;margin-top:25px;padding:17px}
-          .version{margin-top:14px;font-weight:bold;color:#fff}
-          .section{max-width:650px;margin:20px auto;background:#17131aee;border:1px solid #65303a;padding:20px;border-radius:12px}
-          .item{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #453039;gap:10px}
-          select,input{background:#29232b;color:white;border:1px solid #87404a;padding:10px;border-radius:7px;max-width:100%}
-          .hidden{display:none}
-          </style>
-          </head>
-          <body>
-          <header>
-            <div class="logo">AUTHER</div>
-            <nav>
-              <button onclick="showPage('home')">HOME</button>
-              <button onclick="showPage('download')">UNDUH</button>
-              <button onclick="showPage('settings')">SETTING</button>
-            </nav>
-          </header>
-
-          <main id="background">
-            <section id="home">
-              <div class="panel">
-                <h1>AUTHER</h1>
-                <h2>LAUNCHER</h2>
-                <p>Minecraft Java Edition</p>
-                <button class="play" onclick="playGame()">▶ PLAY</button>
-                <div class="version" id="selectedVersion">Minecraft 1.21 | Fabric 0.19.5</div>
-              </div>
-            </section>
-
-            <section id="download" class="hidden">
-              <div class="section">
-                <h2>UNDUH</h2>
-                <div id="categories"></div>
-              </div>
-
-              <div class="section hidden" id="versionPanel">
-                <h3>Pilih Minecraft Version</h3>
-                <select id="mcVersion">
-                  <option>1.21</option>
-                  <option>1.20.6</option>
-                  <option>1.20.4</option>
-                  <option>1.19.4</option>
-                </select>
-                <h3>Pilih Loader</h3>
-                <select id="loader">
-                  <option>Vanilla</option>
-                  <option>Fabric 0.19.5</option>
-                  <option>Forge</option>
-                  <option>NeoForge</option>
-                  <option>Quilt</option>
-                </select>
-                <p><button onclick="installVersion()">SIMPAN PILIHAN</button></p>
-                <p>Instalasi Minecraft sebenarnya belum terhubung.</p>
-              </div>
-            </section>
-
-            <section id="settings" class="hidden">
-              <div class="section">
-                <h2>SETTING</h2>
-                <h3>Ganti Background</h3>
-                <input type="file" accept="image/*" onchange="changeBackground(event)">
-                <h3>Renderer</h3>
-                <select><option>MobileGlues</option></select>
-                <h3>Java Runtime</h3>
-                <select>
-                  <option>Java 8</option>
-                  <option>Java 17</option>
-                  <option>Java 21</option>
-                  <option>Java 25</option>
-                </select>
-                <h3>RAM</h3>
-                <select>
-                  <option>1024 MB</option>
-                  <option>2048 MB</option>
-                  <option>4096 MB</option>
-                </select>
-              </div>
-            </section>
-          </main>
-
-          <script>
-          function showPage(page){
-            ['home','download','settings'].forEach(id=>{
-              document.getElementById(id).classList.toggle('hidden',id!==page);
-            });
-          }
-
-          const categories=['Source All','Version','Mods','Resource','Shader','Worlds'];
-          const container=document.getElementById('categories');
-
-          categories.forEach(name=>{
-            const row=document.createElement('div');
-            row.className='item';
-            const label=document.createElement('span');
-            label.textContent=name;
-            const button=document.createElement('button');
-            button.textContent='BUKA';
-            button.onclick=()=>{
-              document.getElementById('versionPanel').classList.toggle('hidden',name!=='Version');
-              if(name!=='Version') alert('Katalog '+name+' belum terhubung.');
-            };
-            row.append(label,button);
-            container.appendChild(row);
-          });
-
-          function installVersion(){
-            const version=document.getElementById('mcVersion').value;
-            const loader=document.getElementById('loader').value;
-            document.getElementById('selectedVersion').textContent=
-              'Minecraft '+version+' | '+loader;
-            alert('Pilihan versi disimpan. Game belum diinstal.');
-            showPage('home');
-          }
-
-          function changeBackground(event){
-            const file=event.target.files && event.target.files[0];
-            if(!file)return;
-            const reader=new FileReader();
-            reader.onload=function(){
-              document.getElementById('background').style.backgroundImage=
-                'linear-gradient(#160d1666,#100810aa),url("'+reader.result+'")';
-              document.getElementById('background').style.backgroundSize='cover';
-              document.getElementById('background').style.backgroundPosition='center';
-            };
-            reader.readAsDataURL(file);
-          }
-
-          function playGame(){
-            alert('Engine Minecraft Java belum terintegrasi. Minecraft belum bisa dijalankan.');
-          }
-          </script>
-          </body>
-          </html>
-          EOF
-
-      - name: Build APK
-        run: gradle --no-daemon assembleDebug
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
