@@ -1,5 +1,5 @@
 
-name: Test AUTHER Launcher V0.1
+name: Build AUTHER Launcher V0.1
 
 on:
   workflow_dispatch:
@@ -11,75 +11,82 @@ permissions:
   contents: read
 
 jobs:
-  test-build:
-    name: Build and Test AUTHER
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Prepare SDK
         shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          set -e
+          SDK_PATH="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_PATH" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_PATH" >> "$GITHUB_ENV"
+          echo "$SDK_PATH/platform-tools" >> "$GITHUB_PATH"
+          echo "SDK PATH: $SDK_PATH"
+          test -d "$SDK_PATH"
 
-      - name: Accept SDK Licenses
+      - name: Locate SDK Manager
         shell: bash
         run: |
+          set -e
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager tidak ditemukan"
+            exit 1
+          fi
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "SDK Manager ditemukan"
+
+      - name: Accept Android Licenses
+        shell: bash
+        run: |
+          set -e
           set +o pipefail
-          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses
           set -o pipefail
 
-      - name: Install SDK Packages
+      - name: Install Android SDK Packages
         shell: bash
         run: |
-          sdkmanager --sdk_root="$ANDROID_HOME" \
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Verify SDK
+      - name: Verify Android SDK
+        shell: bash
         run: |
-          java -version
-          sdkmanager --version
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
           adb version
+          echo "ANDROID SDK READY"
 
-      - name: Check Project Files
+      - name: Check Android Project
+        shell: bash
         run: |
           test -f gradlew
           test -f settings.gradle || test -f settings.gradle.kts
           test -f app/build.gradle || test -f app/build.gradle.kts
 
-      - name: Setup Gradle
+      - name: Grant Gradle Permission
         run: chmod +x gradlew
 
-      - name: Test Gradle Configuration
-        run: ./gradlew tasks --stacktrace
+      - name: Build AUTHER Launcher
+        run: ./gradlew --no-daemon assembleDebug --stacktrace
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
-      - name: Check APK
-        shell: bash
-        run: |
-          find app/build/outputs/apk -name "*.apk" -type f
-          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -type f -print -quit)"
-
-      - name: Upload Test APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-V0.1-TEST
+          name: AUTHER-Launcher-V0.1
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
