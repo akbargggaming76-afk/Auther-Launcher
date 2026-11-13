@@ -1,7 +1,7 @@
 
-name: AUTHER Launcher Build
+name: AUTHER Launcher V0.1 Build
 
-'on':
+on:
   workflow_dispatch:
   push:
     branches:
@@ -16,16 +16,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create Android Project
+      - name: Generate Android Project
         run: |
           mkdir -p app/src/main/assets
           mkdir -p app/src/main/java/com/auther/launcher
@@ -39,6 +42,7 @@ jobs:
               }
           }
           dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
                   google()
                   mavenCentral()
@@ -54,10 +58,7 @@ jobs:
           }
           EOF
 
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          EOF
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
 
           cat > app/build.gradle <<'EOF'
           plugins {
@@ -82,10 +83,10 @@ jobs:
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
                   android:theme="@android:style/Theme.Material.NoActionBar"
-                  android:label="AUTHER Launcher">
+                  android:label="AUTHER Launcher"
+                  android:usesCleartextTraffic="true">
                   <activity
                       android:name=".MainActivity"
-                      android:configChanges="orientation|screenSize"
                       android:screenOrientation="landscape"
                       android:exported="true">
                       <intent-filter>
@@ -102,84 +103,19 @@ jobs:
 
           import android.app.Activity;
           import android.os.Bundle;
-          import android.content.Intent;
-          import android.net.Uri;
           import android.webkit.WebView;
           import android.webkit.WebSettings;
-          import android.webkit.WebChromeClient;
-          import android.webkit.ValueCallback;
-          import android.webkit.WebViewClient;
 
           public class MainActivity extends Activity {
-              private WebView webView;
-              private ValueCallback<Uri[]> fileCallback;
-              private static final int FILE_REQUEST = 1001;
-
               @Override
-              protected void onCreate(Bundle state) {
-                  super.onCreate(state);
-
-                  getWindow().getDecorView().setSystemUiVisibility(
-                      5894 | 1024 | 512 | 4096
-                  );
-
-                  webView = new WebView(this);
-                  WebSettings settings = webView.getSettings();
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView web = new WebView(this);
+                  WebSettings settings = web.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
-
-                  webView.setWebViewClient(new WebViewClient());
-                  webView.setWebChromeClient(new WebChromeClient() {
-                      @Override
-                      public boolean onShowFileChooser(
-                          WebView view,
-                          ValueCallback<Uri[]> callback,
-                          FileChooserParams params
-                      ) {
-                          if (fileCallback != null) {
-                              fileCallback.onReceiveValue(null);
-                          }
-                          fileCallback = callback;
-
-                          Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                          intent.setType("image/*");
-                          intent.addCategory(Intent.CATEGORY_OPENABLE);
-
-                          startActivityForResult(
-                              Intent.createChooser(intent, "Pilih Skin"),
-                              FILE_REQUEST
-                          );
-                          return true;
-                      }
-                  });
-
-                  setContentView(webView);
-                  webView.loadUrl("file:///android_asset/index.html");
-              }
-
-              @Override
-              protected void onActivityResult(
-                  int requestCode, int resultCode, Intent data
-              ) {
-                  super.onActivityResult(requestCode, resultCode, data);
-                  if (requestCode == FILE_REQUEST && fileCallback != null) {
-                      Uri[] result = null;
-                      if (resultCode == RESULT_OK && data != null
-                          && data.getData() != null) {
-                          result = new Uri[]{data.getData()};
-                      }
-                      fileCallback.onReceiveValue(result);
-                      fileCallback = null;
-                  }
-              }
-
-              @Override
-              public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
               }
           }
           EOF
@@ -189,278 +125,113 @@ jobs:
           <html lang="id">
           <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
           <title>AUTHER Launcher</title>
           <style>
           *{box-sizing:border-box}
-          body{margin:0;background:#101116;color:white;font-family:Arial}
-          header{height:65px;background:#1b1d25;display:flex;align-items:center;justify-content:space-between;padding:0 25px}
-          .logo{font-size:25px;font-weight:bold;color:#ff5148}
-          .tabs{display:flex;gap:25px}
-          .tab{background:transparent;color:white;font-size:16px}
-          .tab.active{color:#ff5148;border-bottom:2px solid #ff5148;border-radius:0}
-          main{max-width:900px;margin:auto;padding:20px}
-          .profile{background:#20232d;padding:16px;border-radius:12px;display:flex;align-items:center;gap:15px}
-          .skin{width:75px;height:75px;border:3px solid #ff5148;background:#a94c37;border-radius:9px;display:grid;place-items:center;font-size:30px;background-size:cover;background-position:center}
-          button{border:0;border-radius:8px;padding:11px 15px;background:#ff5148;color:white;font-weight:bold;cursor:pointer}
-          .orange{background:#e28a37}
-          .menu{display:flex;flex-direction:column;gap:14px;margin-top:20px}
-          .menu button{width:100%;background:#20232d;border:1px solid #555b68;text-align:center;padding:15px;font-size:16px}
-          .menu button.selected{border-color:#ff5148;color:#ff5148}
-          .page{display:none}
-          .page.active{display:block}
-          .back{background:#444957;margin-bottom:15px}
-          .item{background:#20232d;padding:13px;border-radius:10px;margin:10px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
-          .item small{display:block;color:#aaa;margin-top:5px}
-          input,select{accent-color:#ff5148}
-          input[type=range]{width:100%}
-          select,input[type=search]{width:100%;padding:12px;background:#303440;color:white;border:1px solid #555;border-radius:8px}
-          label{display:block;margin:16px 0 7px}
-          .play{width:100%;margin-top:20px;padding:18px;background:#08090d;border:2px solid #ff5148;font-size:22px}
-          .muted{color:#aaa;font-size:12px;line-height:1.5}
-          .progressBox{display:none;background:#20232d;padding:20px;border-radius:12px;margin-top:15px}
-          .bar{height:12px;background:#454957;border-radius:20px;overflow:hidden;margin:8px 0}
-          .fill{height:100%;width:0;background:#35bd70;transition:width .2s}
-          .stage{margin:18px 0}
-          .stageLine{display:flex;justify-content:space-between;gap:10px;font-size:14px}
-          .done{color:#35bd70}
-          .controller{height:230px;background:#171920;border-radius:12px;position:relative;overflow:hidden;margin:15px 0}
-          .joy{position:absolute;left:25px;bottom:25px;width:90px;height:90px;border:3px solid #ff5148;border-radius:50%;display:grid;place-items:center}
-          .stick{width:38px;height:38px;background:#ff5148;border-radius:50%}
-          .ctrl{position:absolute;width:48px;height:48px;border-radius:50%;background:#287bd0;display:grid;place-items:center;touch-action:none}
-          .jump{right:25px;bottom:25px}
-          .attack{right:85px;bottom:85px;background:#d34b45}
-          .sneak{right:105px;bottom:20px;background:#777}
+          body{margin:0;background:#100b10;color:white;font-family:Arial}
+          header{height:60px;background:#171117;display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:2px solid #bd2935}
+          .logo{font-size:24px;font-weight:900;color:#ff424b;letter-spacing:3px}
+          button{background:#a92130;color:white;border:0;border-radius:8px;padding:12px 18px;font-weight:bold}
+          nav{display:flex;gap:8px}
+          main{min-height:calc(100vh - 60px);padding:20px;background:linear-gradient(#0005,#0009),radial-gradient(ellipse at 50% 100%,#842b36,#24121c 65%,#100b10)}
+          .panel{max-width:650px;margin:30px auto;text-align:center;background:#100b10c9;border:1px solid #b52c39;border-radius:15px;padding:25px}
+          h1{font-size:45px;color:#ff414b;margin:10px}
+          h2{letter-spacing:5px}
+          .play{width:100%;font-size:23px;padding:18px;margin-top:20px}
+          .version{margin-top:15px;font-weight:bold}
+          .section{max-width:650px;margin:25px auto;background:#19131a;padding:20px;border-radius:12px}
+          .item{display:flex;justify-content:space-between;padding:14px;border-bottom:1px solid #49313a}
+          select,input{padding:10px;background:#29202a;color:white;border:1px solid #a52b39;border-radius:7px}
+          .hidden{display:none}
           </style>
           </head>
           <body>
           <header>
-            <div class="logo">AUTHER</div>
-            <div class="tabs">
-              <button class="tab active" id="downloadTab" onclick="showMain('download')">Unduh</button>
-              <button class="tab" id="settingsTab" onclick="showMain('settings')">Setting</button>
-            </div>
+          <div class="logo">AUTHER</div>
+          <nav>
+          <button onclick="page('home')">HOME</button>
+          <button onclick="page('download')">UNDUH</button>
+          <button onclick="page('settings')">SETTING</button>
+          </nav>
           </header>
-
           <main>
-          <section id="downloadMain" class="page active">
-            <div id="downloadHome">
-              <div class="profile">
-                <div class="skin" id="skin">👤</div>
-                <div>
-                  <b>PLAYER SKIN</b><br><br>
-                  <button class="orange" onclick="document.getElementById('skinFile').click()">IMPORT SKIN</button>
-                  <input id="skinFile" type="file" accept="image/*" hidden onchange="loadSkin(event)">
-                </div>
-              </div>
-              <h3>Source All</h3>
-              <div class="menu">
-                <button onclick="openCatalog('Version')">Version</button>
-                <button onclick="openCatalog('Mods')">Mods</button>
-                <button onclick="openCatalog('Resource')">Resource</button>
-                <button onclick="openCatalog('Shader')">Shader</button>
-                <button onclick="openCatalog('Worlds')">World</button>
-              </div>
-              <button class="play" onclick="playGame()">▶ PLAY</button>
-            </div>
-
-            <div id="catalog" style="display:none">
-              <button class="back" onclick="backCatalog()">← KEMBALI</button>
-              <h2 id="catalogTitle">Version</h2>
-              <div id="versionOptions" style="display:none">
-                <input type="search" id="versionSearch" placeholder="Cari versi Minecraft..." oninput="filterVersions()">
-                <label>Pilih Loader</label>
-                <select id="loader">
-                  <option>Vanilla</option><option>Fabric</option>
-                  <option>Forge</option><option>NeoForge</option><option>Quilt</option>
-                </select>
-              </div>
-              <div id="catalogItems"></div>
-            </div>
-
-            <div id="installProgress" class="progressBox">
-              <h3 id="progressTitle">Tunggu Pemasangan</h3>
-              <div id="stages"></div>
-              <p id="progressMessage" class="muted">Pemasangan sedang disiapkan...</p>
-              <button id="finishButton" style="display:none" onclick="finishInstall()">Selesai</button>
-            </div>
+          <section id="home">
+          <div class="panel">
+          <h1>AUTHER</h1>
+          <h2>LAUNCHER</h2>
+          <p>Minecraft Java Edition</p>
+          <button class="play" onclick="play()">▶ PLAY</button>
+          <div class="version" id="versionText">Minecraft 1.21 | Fabric 0.19.5</div>
+          </div>
           </section>
-
-          <section id="settingsMain" class="page">
-            <h2>Settings</h2>
-            <label>Graphics Renderer</label>
-            <select><option>MobileGlues</option></select>
-            <label>Java Runtime</label>
-            <select><option>Java 8</option><option>Java 17</option><option>Java 21</option><option>Java 25</option></select>
-            <label>RAM Allocation</label>
-            <input type="range" min="512" max="8192" step="256" value="2048">
-            <h3>Mouse Settings</h3>
-            <label>Ukuran Mouse</label>
-            <input type="range" min="10" max="100" value="40">
-            <label>Kecepatan Mouse</label>
-            <input type="range" min="1" max="100" value="50">
-            <label>Sensitivitas</label>
-            <input type="range" min="1" max="100" value="50">
-            <h3>Custom Controller</h3>
-            <div class="controller" id="controllerArea">
-              <div class="joy"><div class="stick"></div></div>
-              <div class="ctrl jump movable">J</div>
-              <div class="ctrl attack movable">A</div>
-              <div class="ctrl sneak movable">S</div>
-            </div>
-            <label>Ukuran Tombol</label>
-            <input type="range" min="25" max="90" value="48" oninput="resizeButtons(this.value)">
-            <label>Transparansi</label>
-            <input type="range" min="20" max="100" value="100" oninput="opacityButtons(this.value)">
-            <button onclick="alert('Pengaturan controller disimpan selama sesi ini.')">SIMPAN LAYOUT</button>
+          <section id="download" class="hidden">
+          <div class="section">
+          <h2>UNDUH</h2>
+          <div id="categories"></div>
+          </div>
+          <div class="section hidden" id="versionPanel">
+          <h3>Versi Minecraft</h3>
+          <select id="mc"><option>1.21</option><option>1.20.6</option><option>1.20.4</option><option>1.19.4</option></select>
+          <h3>Loader</h3>
+          <select id="loader"><option>Vanilla</option><option>Fabric 0.19.5</option><option>Forge</option><option>NeoForge</option><option>Quilt</option></select>
+          <br><br>
+          <button onclick="installVersion()">INSTAL</button>
+          </div>
+          </section>
+          <section id="settings" class="hidden">
+          <div class="section">
+          <h2>SETTING</h2>
+          <p>Ganti Background</p>
+          <input type="file" accept="image/*" onchange="wallpaper(event)">
+          <p>Renderer</p>
+          <select><option>MobileGlues</option></select>
+          <p>Java Runtime</p>
+          <select><option>Java 8</option><option>Java 17</option><option>Java 21</option><option>Java 25</option></select>
+          <p>RAM</p>
+          <select><option>1024 MB</option><option>2048 MB</option><option>4096 MB</option></select>
+          </div>
           </section>
           </main>
-
           <script>
-          const data={
-            Version:['1.21.11','1.21.10','1.21.8','1.21','1.20.1','1.19.4'],
-            Mods:['Sodium','Lithium','FerriteCore','Mod Menu'],
-            Resource:['Faithful','Bare Bones','Classic 3D'],
-            Shader:['Complementary','BSL Shader','Sildur'],
-            Worlds:['Survival World','Creative World','Skyblock World']
+          function page(id){
+          ['home','download','settings'].forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));
+          }
+          ['Source All','Version','Mods','Resource','Shader','Worlds'].forEach(name=>{
+          let div=document.createElement('div');
+          div.className='item';
+          let label=document.createElement('span');
+          label.textContent=name;
+          let btn=document.createElement('button');
+          btn.textContent='BUKA';
+          btn.onclick=()=>{
+          document.getElementById('versionPanel').classList.toggle('hidden',name!=='Version');
+          if(name!=='Version') alert('Katalog '+name+' belum terhubung.');
           };
-          let currentCategory='';
-          let selectedItem='';
-
-          function showMain(name){
-            document.getElementById('downloadMain').classList.toggle('active',name==='download');
-            document.getElementById('settingsMain').classList.toggle('active',name==='settings');
-            document.getElementById('downloadTab').classList.toggle('active',name==='download');
-            document.getElementById('settingsTab').classList.toggle('active',name==='settings');
-            if(name==='download')backCatalog();
-          }
-
-          function openCatalog(category){
-            currentCategory=category;
-            document.getElementById('downloadHome').style.display='none';
-            document.getElementById('catalog').style.display='block';
-            document.getElementById('installProgress').style.display='none';
-            document.getElementById('catalogTitle').textContent=category;
-            document.getElementById('versionOptions').style.display=category==='Version'?'block':'none';
-            renderItems(data[category]);
-          }
-
-          function renderItems(items){
-            document.getElementById('catalogItems').innerHTML=items.map(name=>
-              `<div class="item"><div><b>${name}</b><small>${currentCategory}</small></div><button onclick="startInstall('${name.replace(/'/g,"\\'")}')">INSTAL</button></div>`
-            ).join('');
-          }
-
-          function filterVersions(){
-            const q=document.getElementById('versionSearch').value.toLowerCase();
-            renderItems(data.Version.filter(v=>v.toLowerCase().includes(q)));
-          }
-
-          function backCatalog(){
-            document.getElementById('catalog').style.display='none';
-            document.getElementById('installProgress').style.display='none';
-            document.getElementById('downloadHome').style.display='block';
-          }
-
-          function startInstall(name){
-            selectedItem=name;
-            document.getElementById('catalog').style.display='none';
-            const box=document.getElementById('installProgress');
-            box.style.display='block';
-            document.getElementById('progressTitle').textContent=
-              currentCategory==='Version'?'Tunggu Pemasangan Versi':'Tunggu Pemasangan';
-            document.getElementById('finishButton').style.display='none';
-
-            const stages=currentCategory==='Version'
-              ?['Cache game','Version '+name,'Loader '+name+' - '+document.getElementById('loader').value,'Menyiapkan semua']
-              :['Mengunduh '+name,'Memeriksa file','Menyiapkan pemasangan','Memasang '+name];
-
-            document.getElementById('stages').innerHTML=stages.map((s,i)=>
-              `<div class="stage"><div class="stageLine"><b>${s}</b><span id="pct${i}">0%</span></div><div class="bar"><div class="fill" id="fill${i}"></div></div></div>`
-            ).join('');
-
-            document.getElementById('progressMessage').textContent=
-              'Catatan: ini prototipe antarmuka. Pemasangan file game belum terhubung.';
-
-            stages.forEach((s,i)=>{
-              let p=0;
-              const timer=setInterval(()=>{
-                p+=5;
-                document.getElementById('fill'+i).style.width=p+'%';
-                document.getElementById('pct'+i).textContent=p+'%';
-                if(p>=100){
-                  clearInterval(timer);
-                  if(i===stages.length-1){
-                    document.getElementById('progressMessage').textContent=
-                      'Simulasi selesai. File game belum benar-benar dipasang.';
-                    document.getElementById('finishButton').style.display='block';
-                  }
-                }
-              },80*(i+1));
-            });
-          }
-
-          function finishInstall(){
-            document.getElementById('progressTitle').textContent=
-              currentCategory==='Version'?'Version belum benar-benar terinstal':'Simulasi pemasangan selesai';
-            document.getElementById('progressMessage').textContent=
-              'Pemasangan nyata membutuhkan integrasi pengunduh dan penyimpan file Android.';
-            document.getElementById('finishButton').style.display='none';
-            const b=document.createElement('button');
-            b.textContent='Kembali';
-            b.onclick=backCatalog;
-            document.getElementById('stages').appendChild(b);
-          }
-
-          function loadSkin(event){
-            const file=event.target.files[0];
-            if(!file)return;
-            const reader=new FileReader();
-            reader.onload=e=>{
-              const skin=document.getElementById('skin');
-              skin.textContent='';
-              skin.style.backgroundImage='url('+e.target.result+')';
-            };
-            reader.readAsDataURL(file);
-          }
-
-          function playGame(){
-            alert('Minecraft Java belum dapat dijalankan. Runtime Java, library, aset, loader, dan renderer perlu diintegrasikan terlebih dahulu.');
-          }
-
-          function resizeButtons(v){
-            document.querySelectorAll('.ctrl').forEach(b=>{
-              b.style.width=v+'px';b.style.height=v+'px';
-            });
-          }
-          function opacityButtons(v){
-            document.querySelectorAll('.ctrl,.joy').forEach(b=>b.style.opacity=v/100);
-          }
-
-          document.querySelectorAll('.movable').forEach(el=>{
-            let drag=false,dx=0,dy=0;
-            el.addEventListener('pointerdown',e=>{
-              drag=true;
-              const r=el.getBoundingClientRect();
-              dx=e.clientX-r.left;dy=e.clientY-r.top;
-              el.setPointerCapture(e.pointerId);
-            });
-            el.addEventListener('pointermove',e=>{
-              if(!drag)return;
-              const r=document.getElementById('controllerArea').getBoundingClientRect();
-              el.style.left=(e.clientX-r.left-dx)+'px';
-              el.style.top=(e.clientY-r.top-dy)+'px';
-              el.style.right='auto';el.style.bottom='auto';
-            });
-            el.addEventListener('pointerup',()=>drag=false);
+          div.append(label,btn);
+          document.getElementById('categories').append(div);
           });
+          function installVersion(){
+          document.getElementById('versionText').textContent='Minecraft '+document.getElementById('mc').value+' | '+document.getElementById('loader').value;
+          alert('Pilihan versi disimpan. Instalasi game belum terhubung.');
+          page('home');
+          }
+          function wallpaper(e){
+          if(!e.target.files[0])return;
+          let url=URL.createObjectURL(e.target.files[0]);
+          document.querySelector('main').style.background='linear-gradient(#0005,#0009),url('+url+') center/cover';
+          }
+          function play(){
+          alert('Engine Minecraft Java belum terintegrasi. PLAY belum dapat menjalankan game.');
+          }
           </script>
           </body>
           </html>
           EOF
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
