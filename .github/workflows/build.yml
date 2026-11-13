@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup JDK 17
+      - name: Setup JDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -34,7 +34,7 @@ jobs:
           yes | sdkmanager --licenses
           set -o pipefail
 
-      - name: Install Android SDK
+      - name: Install Android SDK Packages
         shell: bash
         run: |
           sdkmanager --sdk_root="$ANDROID_HOME" \
@@ -42,25 +42,53 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Verify Android SDK
+      - name: Verify SDK
         run: |
+          echo "Java:"
+          java -version
+          echo "Android SDK:"
           sdkmanager --version
           adb version
 
-      - name: Check Project
+      - name: Check Android Project
+        shell: bash
         run: |
-          test -f gradlew
-          test -f settings.gradle || test -f settings.gradle.kts
-          test -f app/build.gradle || test -f app/build.gradle.kts
+          if [ ! -f gradlew ]; then
+            echo "ERROR: gradlew tidak ditemukan"
+            exit 1
+          fi
 
-      - name: Build APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
+            echo "ERROR: settings.gradle tidak ditemukan"
+            exit 1
+          fi
 
-      - name: Upload APK
+          if [ ! -f app/build.gradle ] && [ ! -f app/build.gradle.kts ]; then
+            echo "ERROR: app/build.gradle tidak ditemukan"
+            exit 1
+          fi
+
+      - name: Grant Gradle Permission
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+        continue-on-error: true
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-V0.1
+          name: AUTHER-Launcher-V0.1-Debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Upload Release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AUTHER-Launcher-V0.1-Release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
