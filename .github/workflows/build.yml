@@ -4,30 +4,41 @@ name: Build AUTHER Launcher V0.1 APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install SDK
+      - name: Install Android SDK
         run: |
+          sdkmanager --licenses
           sdkmanager --install \
             "platforms;android-35" \
-            "build-tools;35.0.0"
+            "build-tools;35.0.0" \
+            "platform-tools"
 
       - name: Create Android Project
         run: |
@@ -42,6 +53,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -49,6 +61,7 @@ jobs:
                   mavenCentral()
               }
           }
+
           rootProject.name = 'AUTHER-Launcher'
           include ':app'
           EOF
@@ -86,18 +99,22 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET"/>
+
               <application
                   android:theme="@android:style/Theme.Material.Light.NoActionBar"
                   android:label="AUTHER Launcher"
                   android:usesCleartextTraffic="true">
+
                   <activity
                       android:name=".MainActivity"
                       android:screenOrientation="landscape"
                       android:exported="true">
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
+
                   </activity>
               </application>
           </manifest>
@@ -114,8 +131,9 @@ jobs:
 
           public class MainActivity extends Activity {
               @Override
-              protected void onCreate(Bundle state) {
-                  super.onCreate(state);
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
                   getWindow().getDecorView().setSystemUiVisibility(
                       5894 | 1024 | 512 | 4096
                   );
@@ -123,8 +141,11 @@ jobs:
                   WebView web = new WebView(this);
                   web.setWebViewClient(new WebViewClient());
                   web.setWebChromeClient(new WebChromeClient());
+
                   web.getSettings().setJavaScriptEnabled(true);
                   web.getSettings().setDomStorageEnabled(true);
+                  web.getSettings().setAllowFileAccess(true);
+
                   web.loadUrl("file:///android_asset/index.html");
                   setContentView(web);
               }
@@ -138,158 +159,346 @@ jobs:
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <title>AUTHER Launcher</title>
+
           <style>
           *{box-sizing:border-box}
-          body{margin:0;background:#101014;color:white;font-family:Arial}
-          header{padding:18px;background:#19191f;display:flex;justify-content:space-between;align-items:center}
-          header h2{color:#ff3434;margin:0}
-          nav{display:flex;gap:8px;padding:12px;background:#19191f}
-          button{background:#292930;color:white;border:1px solid #45454f;padding:12px;border-radius:8px;cursor:pointer}
-          button.active,.play{background:#e52d35;border:0}
-          main{padding:18px}
-          .panel{background:#1c1c24;padding:18px;border-radius:12px;margin-bottom:14px}
-          .hidden{display:none}
-          .play{font-size:22px;padding:16px 55px;font-weight:bold}
-          input,select{background:#292930;color:white;padding:12px;border:1px solid #555;border-radius:7px;width:100%;margin:7px 0}
-          .item{background:#292930;padding:13px;margin:8px 0;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-          .item small{color:#aaa}
-          progress{width:100%;height:17px;accent-color:#e52d35}
-          h3{color:#ff5555}
+          body{margin:0;background:#101116;color:white;font-family:Arial}
+          header{padding:18px;background:#191a21;display:flex;justify-content:space-between}
+          .logo{color:#ef424c;font-weight:bold;font-size:21px}
+          nav{display:flex;gap:8px;padding:12px;background:#191a21;overflow-x:auto}
+          button{background:#292b35;color:white;border:1px solid #484a55;padding:12px;border-radius:7px}
+          button.active,.red{background:#e43c46;border-color:#e43c46}
+          main{padding:16px;max-width:1100px;margin:auto}
+          .page{display:none}.show{display:block}
+          .panel{background:#1b1d25;padding:17px;border-radius:12px;margin-bottom:14px}
+          .item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#292b35;padding:12px;margin:8px 0;border-radius:8px}
+          .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+          .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+          .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+          input,select{width:100%;padding:12px;background:#292b35;color:white;border:1px solid #555;border-radius:7px;margin:7px 0}
+          .selected{border:1px solid #f0444c;background:#48252b}
+          .muted{color:#aaa;font-size:13px}
+          .play{font-size:23px;padding:16px 60px;font-weight:bold}
+          .progress{height:15px;background:#333;border-radius:20px;overflow:hidden}
+          .progress div{height:100%;width:0;background:#e43c46}
+          @media(max-width:600px){.grid{grid-template-columns:repeat(3,1fr)}}
           </style>
           </head>
+
           <body>
-          <header><h2>AUTHER LAUNCHER</h2><span>V0.1</span></header>
+          <header>
+            <span class="logo">AUTHER LAUNCHER</span>
+            <span>V0.1</span>
+          </header>
+
           <nav>
-          <button class="active" onclick="page('home',this)">Home</button>
-          <button onclick="page('download',this)">Unduh</button>
-          <button onclick="page('settings',this)">Setting</button>
+            <button class="active" onclick="page('home',this)">Home</button>
+            <button onclick="page('download',this)">Unduh</button>
+            <button onclick="page('account',this)">Akun</button>
+            <button onclick="page('settings',this)">Setting</button>
           </nav>
 
           <main>
-          <section id="home">
-          <div class="panel" style="text-align:center;padding:55px 10px">
-          <h1>AUTHER LAUNCHER</h1>
-          <p>Minecraft Java Launcher</p>
-          <button class="play" onclick="play()">PLAY</button>
-          <p id="selected">Belum ada versi terpasang</p>
-          </div>
+
+          <section id="home" class="page show">
+            <div class="panel" style="text-align:center;padding:60px 10px">
+              <h1>AUTHER LAUNCHER</h1>
+              <p>Minecraft Java Launcher</p>
+              <button class="red play" onclick="play()">PLAY</button>
+              <p id="homeVersion">Belum ada versi terpasang</p>
+            </div>
           </section>
 
-          <section id="download" class="hidden">
-          <h2>Unduh</h2>
-          <div class="panel">
-          <button onclick="catalog('version')">Version & Loader</button>
-          <button onclick="catalog('mods')">Mods & Modpack</button>
-          <button onclick="catalog('resourcepacks')">Resource</button>
-          <button onclick="catalog('shaders')">Shader</button>
-          <button onclick="catalog('worlds')">Worlds</button>
-          </div>
-          <div id="catalog" class="panel">
-          Pilih kategori untuk melihat katalog.
-          </div>
+          <section id="download" class="page">
+            <h2>Unduh</h2>
+            <div class="panel grid3">
+              <button onclick="catalog('version')">Version & Loader</button>
+              <button onclick="catalog('mods')">Mods & Modpack</button>
+              <button onclick="catalog('resourcepacks')">Resource</button>
+              <button onclick="catalog('shaders')">Shader</button>
+              <button onclick="catalog('worlds')">Worlds</button>
+            </div>
+            <div class="panel" id="catalog">
+              Pilih kategori unduhan.
+            </div>
           </section>
 
-          <section id="settings" class="hidden">
-          <h2>Setting</h2>
-          <div class="panel">
-          <h3>Renderer</h3>
-          <select><option>MobileGlues</option><option>Default</option></select>
-          <h3>Custom Controller</h3>
-          <button onclick="alert('Pengaturan controller belum terhubung ke game.')">Configure Controller</button>
-          <h3>Custom Mouse</h3>
-          <label>Kecepatan mouse</label>
-          <input type="range" min="1" max="100" value="50">
-          <h3>RAM</h3>
-          <select><option>1024 MB</option><option>2048 MB</option><option>4096 MB</option>
-          </select>
-          <h3>Change Background</h3>
-          <input type="file" accept="image/*" onchange="background(event)">
-          </div>
+          <section id="account" class="page">
+            <div class="panel">
+              <button onclick="page('home',document.querySelector('nav button'))">← Kembali</button>
+              <h2>Name upload</h2>
+
+              <div class="row">
+                <div>
+                  <input id="playerName" value="ZeeCraft" placeholder="Nama pemain">
+
+                  <h3>Impor skin</h3>
+                  <button class="red" onclick="document.getElementById('skinFile').click()">Impor</button>
+                  <input id="skinFile" type="file" accept="image/png" hidden onchange="importSkin(event)">
+                  <p class="muted" id="skinStatus">Pilih skin PNG Minecraft</p>
+                </div>
+
+                <div>
+                  <h3>Akun</h3>
+                  <div id="accountTypes">
+                    <div class="item" onclick="chooseAccount('Ely.by',this)">Ely.by</div>
+                    <div class="item" onclick="chooseAccount('Offline',this)">Offline</div>
+                    <div class="item" onclick="chooseAccount('Microsoft',this)">Microsoft</div>
+                  </div>
+                  <p id="accountStatus" class="muted">Belum memilih akun</p>
+                </div>
+              </div>
+            </div>
           </section>
 
-          <section id="install" class="hidden">
-          <div class="panel">
-          <h2>Instalasi</h2>
-          <h3 id="stage">Menunggu</h3>
-          <progress id="bar" value="0" max="100"></progress>
-          <p id="percent">0%</p>
-          <div id="done" class="hidden">
-          <h2>Version sudah selesai</h2>
-          <button onclick="finish()">Selesai</button>
-          </div>
-          </div>
+          <section id="settings" class="page">
+            <h2>Setting</h2>
+            <div class="panel">
+              <button style="width:100%;margin:5px" onclick="page('quality',null)">Renderer Cuality</button>
+              <button style="width:100%;margin:5px" onclick="alert('Controller belum terhubung ke Minecraft.')">Custome controller</button>
+              <button style="width:100%;margin:5px" onclick="alert('Mouse belum terhubung ke Minecraft.')">mouse setting</button>
+              <button style="width:100%;margin:5px" onclick="document.getElementById('wallpaper').click()">Background</button>
+              <input id="wallpaper" type="file" accept="image/*" hidden onchange="changeBackground(event)">
+              <button style="width:100%;margin:5px" onclick="page('about',null)">Tentang</button>
+            </div>
           </section>
+
+          <section id="quality" class="page">
+            <button onclick="page('settings',null)">← Kembali</button>
+            <div class="panel">
+              <h2>Cuality</h2>
+              <h3>Runtime</h3>
+              <div class="grid3">
+                <button onclick="runtime('25',this)">25</button>
+                <button onclick="runtime('21',this)">21</button>
+                <button onclick="runtime('17',this)">17</button>
+                <button onclick="runtime('8',this)">8</button>
+              </div>
+              <p id="runtimeStatus" class="muted">Runtime belum dipilih</p>
+
+              <h3>Memory</h3>
+              <h2 id="memoryValue">140</h2>
+              <input type="range" min="1" max="4" step="1" value="1"
+                oninput="memoryChange(this.value)">
+              <div style="display:flex;justify-content:space-between">
+                <span>1gb</span><span>2gb</span><span>3gb</span><span>4gb</span>
+              </div>
+            </div>
+          </section>
+
+          <section id="about" class="page">
+            <button onclick="page('settings',null)">← Kembali</button>
+            <div class="panel">
+              <h2>Tentang</h2>
+              <div class="item">
+                <b>v0.1</b>
+                <button class="red" onclick="openChannel()">Cek pembaruan</button>
+              </div>
+              <p>Dibuat oleh</p>
+              <h3>YuzeeCraft</h3>
+            </div>
+          </section>
+
+          <section id="install" class="page">
+            <div class="panel">
+              <h2>Instalasi</h2>
+              <h3 id="stage">Menunggu</h3>
+              <div class="progress"><div id="bar"></div></div>
+              <p id="percent">0%</p>
+              <p id="installMessage" class="muted"></p>
+            </div>
+          </section>
+
           </main>
 
           <script>
-          let current='home';
-          function page(id,btn){
-            document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-            document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
-            if(btn)btn.classList.add('active');
-            current=id;
+          const channel="https://whatsapp.com/channel/0029VbEhRzO4IBhBLF0U5K0t";
+          let account="";
+          let selectedLoader="Fabric";
+          let selectedVersion="";
+
+          function page(id,button){
+            document.querySelectorAll(".page").forEach(x=>x.classList.remove("show"));
+            document.getElementById(id).classList.add("show");
+            document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+            if(button)button.classList.add("active");
           }
+
           function play(){
-            alert('Mesin Minecraft Java belum terintegrasi. Tombol PLAY belum dapat menjalankan game.');
+            alert("Mesin Minecraft Java belum terintegrasi. Minecraft belum dapat dijalankan.");
           }
-          function background(e){
-            const f=e.target.files[0];
-            if(!f)return;
-            const r=new FileReader();
-            r.onload=()=>document.body.style.backgroundImage='url('+r.result+')';
-            r.readAsDataURL(f);
+
+          function openChannel(){
+            window.open(channel,"_blank");
           }
+
+          function chooseAccount(name,element){
+            account=name;
+            document.querySelectorAll("#accountTypes .item").forEach(x=>x.classList.remove("selected"));
+            element.classList.add("selected");
+            document.getElementById("accountStatus").textContent="Akun aktif: "+name;
+          }
+
+          function importSkin(event){
+            const file=event.target.files[0];
+            if(!file)return;
+            const img=new Image();
+            img.onload=()=>{
+              if(!((img.width===64&&img.height===64)||(img.width===64&&img.height===32))){
+                alert("Ukuran skin harus 64x64 atau 64x32.");
+                return;
+              }
+              document.getElementById("skinStatus").textContent="Skin dipilih: "+file.name;
+            };
+            img.src=URL.createObjectURL(file);
+          }
+
+          function changeBackground(event){
+            const file=event.target.files[0];
+            if(!file)return;
+            const reader=new FileReader();
+            reader.onload=()=>document.body.style.backgroundImage="url("+reader.result+")";
+            reader.readAsDataURL(file);
+          }
+
+          function runtime(value,element){
+            document.getElementById("runtimeStatus").textContent="Runtime Java "+value;
+            document.querySelectorAll("#quality button").forEach(x=>x.classList.remove("selected"));
+            element.classList.add("selected");
+          }
+
+          function memoryChange(value){
+            const values={1:140,2:1024,3:1045,4:2042};
+            document.getElementById("memoryValue").textContent=values[value];
+          }
+
+          function isApril(id){
+            return /20w14∞|3d shareware|23w13a_or_b|24w14potato|25w14craftmine/i.test(id);
+          }
+
           async function catalog(type){
-            const box=document.getElementById('catalog');
-            box.innerHTML='<h3>'+type+'</h3>';
-            if(type==='version'){
-              box.innerHTML+='<p>Versi resmi Minecraft</p>';
-              try{
-                const r=await fetch('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json');
-                const j=await r.json();
-                j.versions.slice(0,40).forEach(v=>{
-                  box.innerHTML+=`<div class="item"><span>${v.id}<br><small>${v.type}</small></span><button onclick="installItem('${v.id}','Version')">Instal</button></div>`;
-                });
-              }catch(e){box.innerHTML+='<p>Katalog versi gagal dimuat.</p>'}
+            page("download",document.querySelectorAll("nav button")[1]);
+            const box=document.getElementById("catalog");
+            box.innerHTML="<h2>"+type+"</h2>";
+
+            if(type==="version"){
+              box.innerHTML+=`
+                <h3>Jenis versi Minecraft</h3>
+                <div class="grid">
+                  <button onclick="loadVersions('release')">Release</button>
+                  <button onclick="loadVersions('snapshot')">Snapshot</button>
+                  <button onclick="loadVersions('april')">April mop</button>
+                  <button onclick="loadVersions('old_alpha')">Alpha</button>
+                  <button onclick="loadVersions('old_beta')">Beta</button>
+                </div>
+                <h3>Loader</h3>
+                <div class="grid3">
+                  <button onclick="chooseLoader('Fabric',this)">Fabric</button>
+                  <button onclick="chooseLoader('Forge',this)">Forge</button>
+                  <button onclick="chooseLoader('OptiFine',this)">Optifine</button>
+                </div>
+                <h3>Unduh Versi Minecraft</h3>
+                <div id="versionResults">Memuat...</div>`;
+              loadVersions("release");
               return;
             }
-            if(type==='worlds'){
-              box.innerHTML+='<p>Katalog world belum memiliki sumber unduhan yang terhubung.</p>';
+
+            if(type==="worlds"){
+              box.innerHTML+="<p>Katalog worlds belum memiliki sumber unduhan terintegrasi.</p>";
               return;
             }
-            const facets=type==='mods'?'project_type:mod':type==='resourcepacks'?'project_type:resourcepack':'project_type:shader';
+
+            const projectType=type==="mods"?"mod":type==="resourcepacks"?"resourcepack":"shader";
+            box.innerHTML+=`
+              <input id="catalogSearch" placeholder="Tuliskan ulasan mod">
+              <button onclick="searchProjects('${projectType}')">Cari</button>
+              <div id="projectResults">Memuat katalog...</div>`;
+            searchProjects(projectType);
+          }
+
+          function chooseLoader(name,element){
+            selectedLoader=name;
+            document.querySelectorAll("#catalog .grid3 button").forEach(x=>x.classList.remove("selected"));
+            element.classList.add("selected");
+          }
+
+          async function loadVersions(type){
+            const result=document.getElementById("versionResults");
+            if(!result)return;
+            result.textContent="Memuat versi resmi Mojang...";
             try{
-              const r=await fetch('https://api.modrinth.com/v2/search?limit=30&facets='+encodeURIComponent('[["'+facets+'"]]'));
-              const j=await r.json();
-              j.hits.forEach(v=>{
-                const name=document.createElement('div');
-                name.className='item';
-                const label=document.createElement('span');
-                label.textContent=v.title;
-                const btn=document.createElement('button');
-                btn.textContent='Instal';
-                btn.onclick=()=>installItem(v.project_id,type);
-                name.append(label,btn);
-                box.append(name);
+              const response=await fetch("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+              if(!response.ok)throw Error("Gagal memuat");
+              const data=await response.json();
+              let versions=data.versions;
+
+              if(type==="release")versions=versions.filter(v=>v.type==="release"&&!isApril(v.id));
+              if(type==="snapshot")versions=versions.filter(v=>v.type==="snapshot"&&!isApril(v.id));
+              if(type==="april")versions=versions.filter(v=>isApril(v.id));
+              if(type==="old_alpha")versions=versions.filter(v=>v.type==="old_alpha");
+              if(type==="old_beta")versions=versions.filter(v=>v.type==="old_beta");
+
+              result.innerHTML="";
+              versions.forEach(v=>{
+                const item=document.createElement("div");
+                item.className="item";
+                const label=document.createElement("span");
+                label.textContent=v.id+" ("+v.type+")";
+                const btn=document.createElement("button");
+                btn.textContent="Instal";
+                btn.onclick=()=>installNotice(v.id,"Minecraft");
+                item.append(label,btn);
+                result.append(item);
               });
-            }catch(e){box.innerHTML+='<p>Katalog gagal dimuat. Periksa koneksi internet.</p>'}
+              if(!versions.length)result.textContent="Tidak ada versi pada kategori ini.";
+            }catch(e){
+              result.textContent="Gagal memuat katalog. Periksa koneksi internet.";
+            }
           }
-          function installItem(id,type){
-            alert('Item: '+id+'. Pengunduhan dan pemasangan ke folder Minecraft belum terintegrasi.');
+
+          async function searchProjects(type){
+            const result=document.getElementById("projectResults");
+            if(!result)return;
+            result.textContent="Memuat...";
+            const query=document.getElementById("catalogSearch")?.value||"";
+            try{
+              const facets=encodeURIComponent(JSON.stringify([["project_type:"+type]]));
+              const url="https://api.modrinth.com/v2/search?limit=50&facets="+facets+"&query="+encodeURIComponent(query);
+              const response=await fetch(url);
+              if(!response.ok)throw Error("Gagal");
+              const data=await response.json();
+              result.innerHTML="";
+              data.hits.forEach(project=>{
+                const item=document.createElement("div");
+                item.className="item";
+                const label=document.createElement("span");
+                label.textContent=project.title;
+                const btn=document.createElement("button");
+                btn.textContent="Instal";
+                btn.onclick=()=>installNotice(project.project_id,type);
+                item.append(label,btn);
+                result.append(item);
+              });
+              if(!data.hits.length)result.textContent="Tidak ada hasil.";
+            }catch(e){
+              result.textContent="Katalog gagal dimuat.";
+            }
           }
-          function finish(){page('home',document.querySelector('nav button'))}
+
+          function installNotice(id,type){
+            alert("Item "+id+" dipilih. Unduhan dan pemasangan ke folder Minecraft belum terintegrasi. Belum ada file yang dipasang.");
+          }
           </script>
           </body>
           </html>
           EOF
 
-      - name: Build APK
-        run: |
-          gradle --no-daemon assembleDebug
+      - name: Build Debug APK
+        run: gradle --no-daemon --stacktrace assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AUTHER-Launcher-V0.1
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
