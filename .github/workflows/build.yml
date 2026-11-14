@@ -1,5 +1,5 @@
 
-name: Build AUTHER Launcher V0.1
+name: Build AUTHER Playable APK
 
 on:
   workflow_dispatch:
@@ -13,73 +13,74 @@ permissions:
 
 jobs:
   build:
-    name: Build AUTHER Test APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    name: Build AUTHER Minecraft Java
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      - name: Checkout AUTHER
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Download Minecraft Launcher Engine
+        uses: actions/checkout@v4
+        with:
+          repository: AngelAuraMC/Amethyst-Android
+          ref: v3_openjdk
+          path: engine
+          submodules: recursive
+
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+      - name: Download Java 8 Runtime
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build.yml
+          path: engine/app_pojavlauncher/src/main/assets/components/jre
+          workflow_conclusion: completed
+          repo: AngelAuraMC/angelauramc-openjdk-build
+          branch: buildjre8
+          name: jre8-pojav
 
-      - name: Install Android SDK
+      - name: Change App Name to AUTHER
+        working-directory: engine
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Extract AUTHER ZIP
-        run: |
-          mkdir -p extracted
-          test -f AutherLauncher_0.1.zip
-          unzip -oq AutherLauncher_0.1.zip -d extracted
-
-      - name: Find Android Project
-        id: project
-        run: |
-          SETTINGS=$(find extracted -type f \
-            \( -name settings.gradle -o -name settings.gradle.kts \) \
-            -print -quit)
-
-          if [ -z "$SETTINGS" ]; then
-            echo "::error::settings.gradle tidak ditemukan"
-            find extracted -maxdepth 5 -type f
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS")
-
-          if [ ! -f "$PROJECT_DIR/app/build.gradle" ] && \
-             [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "::error::app/build.gradle tidak ditemukan"
-            exit 1
-          fi
-
-          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          FILE="app_pojavlauncher/src/main/res/values/strings.xml"
+          sed -i 's#<string name="app_name" translatable="false">Amethyst</string>#<string name="app_name" translatable="false">AUTHER</string>#' "$FILE"
+          sed -i 's#<string name="app_short_name" translatable="false">Amethyst</string>#<string name="app_short_name" translatable="false">AUTHER</string>#' "$FILE"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          validate-wrappers: false
+          gradle-version: '9.6.1'
 
-      - name: Build APK
-        working-directory: ${{ steps.project.outputs.dir }}
-        run: gradle --no-daemon assembleDebug --stacktrace
+      - name: Prepare Launcher
+        working-directory: engine
+        run: |
+          chmod +x scripts/languagelist_updater.sh
+          ./scripts/languagelist_updater.sh
+          mkdir -p out
 
-      - name: Upload APK
+      - name: Build AUTHER APK
+        working-directory: engine
+        run: |
+          gradle --no-daemon :app_pojavlauncher:assembleDebug --stacktrace
+
+      - name: Prepare APK
+        working-directory: engine
+        run: |
+          mkdir -p out
+          cp app_pojavlauncher/build/outputs/apk/debug/app_pojavlauncher-debug.apk out/AUTHER-debug.apk
+          test -s out/AUTHER-debug.apk
+
+      - name: Upload AUTHER APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Launcher-Test-APK
-          path: ${{ steps.project.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          name: AUTHER-Playable-Debug-APK
+          path: engine/out/AUTHER-debug.apk
           if-no-files-found: error
           retention-days: 14
