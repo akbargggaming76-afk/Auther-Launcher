@@ -1,5 +1,5 @@
 
-name: Build AUTHER Playable APK
+name: Build Vox Launcher V0.1
 
 on:
   workflow_dispatch:
@@ -13,20 +13,14 @@ permissions:
 
 jobs:
   build:
-    name: Build AUTHER Minecraft Java
+    name: Build Vox Launcher
     runs-on: ubuntu-22.04
     timeout-minutes: 120
 
     steps:
-      - name: Checkout AUTHER
-        uses: actions/checkout@v4
-
-      - name: Download Minecraft Launcher Engine
+      - name: Checkout Vox Launcher
         uses: actions/checkout@v4
         with:
-          repository: AngelAuraMC/Amethyst-Android
-          ref: v3_openjdk
-          path: engine
           submodules: recursive
 
       - name: Setup Java 21
@@ -35,52 +29,36 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Download Java 8 Runtime
-        uses: dawidd6/action-download-artifact@v9
-        with:
-          workflow: build.yml
-          path: engine/app_pojavlauncher/src/main/assets/components/jre
-          workflow_conclusion: completed
-          repo: AngelAuraMC/angelauramc-openjdk-build
-          branch: buildjre8
-          name: jre8-pojav
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
 
-      - name: Change App Name to AUTHER
-        working-directory: engine
+      - name: Install Android SDK
         run: |
-          FILE="app_pojavlauncher/src/main/res/values/strings.xml"
-          sed -i 's#<string name="app_name" translatable="false">Amethyst</string>#<string name="app_name" translatable="false">AUTHER</string>#' "$FILE"
-          sed -i 's#<string name="app_short_name" translatable="false">Amethyst</string>#<string name="app_short_name" translatable="false">AUTHER</string>#' "$FILE"
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.3.13750724"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          validate-wrappers: false
           gradle-version: '9.6.1'
 
-      - name: Prepare Launcher
-        working-directory: engine
+      - name: Check Vox Android Project
         run: |
-          chmod +x scripts/languagelist_updater.sh
-          ./scripts/languagelist_updater.sh
-          mkdir -p out
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
 
-      - name: Build AUTHER APK
-        working-directory: engine
+      - name: Build Debug APK
         run: |
-          gradle --no-daemon :app_pojavlauncher:assembleDebug --stacktrace
+          gradle --no-daemon assembleDebug --stacktrace
 
-      - name: Prepare APK
-        working-directory: engine
-        run: |
-          mkdir -p out
-          cp app_pojavlauncher/build/outputs/apk/debug/app_pojavlauncher-debug.apk out/AUTHER-debug.apk
-          test -s out/AUTHER-debug.apk
-
-      - name: Upload AUTHER APK
+      - name: Upload Vox APK
         uses: actions/upload-artifact@v4
         with:
-          name: AUTHER-Playable-Debug-APK
-          path: engine/out/AUTHER-debug.apk
+          name: Vox-Launcher-V0.1-APK
+          path: "**/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
