@@ -1,0 +1,34 @@
+*.iml
+.gradle
+/local.properties
+local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Keystores & credentials
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.key
+google-services.json
+
+# Built outputs
+*.apk
+*.aab
+build/
+app/build/
+
+# Mesin Rust (Horizon): dipasang saat build oleh scripts/fetch-horizon-engine.sh, tidak disimpan di repo
+/app/src/main/jniLibs/arm64-v8a/libhorizon_android.so
+/app/src/main/assets/engine-data.zip
+/app/src/main/assets/licenses/horizon/
+/.horizon-engine-installed
+
+# Kotlin / OS specific
+.kotlin/
+Thumbs.db
